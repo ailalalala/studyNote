@@ -421,9 +421,179 @@ public class User
 
 #### 3.1.3、mappers元素
 
+**mappers：**
 
+- 映射器：定义映射sql语句的文件
 
+- 既然 MyBatis 的行为其他元素已经配置完了，我们现在就要定义 SQL 映射语句了。但是首先我们
 
+  需要告诉 MyBatis 到哪里去找到这些语句。 Java 在自动查找这方面没有提供一个很好的方法，所
 
+  以最佳的方式是告诉 MyBatis 到哪里去找映射文件。你可以使用相对于类路径的资源引用， 或完
 
+  全限定资源定位符（包括 file:/// 的 URL），或类名和包名等。映射器是MyBatis中最核心
+
+  的组件之一，在MyBatis 3之前，只支持xml映射器，即：所有的SQL语句都必须在xml文件中配
+
+  置。而从MyBatis 3开始，还支持接口映射器，这种映射器方式允许以Java代码的方式注解定义SQL
+
+  语句，非常简洁。
+
+**引入资源方式：**
+
+```xml
+<!-- 使用相对于类路径的资源引用 -->
+<mappers>
+  <mapper resource="com/xin/dao/UserMapper.xml"/>
+</mappers>
+```
+
+```xml
+<!-- 使用完全限定资源定位符（URL） -->
+<mappers>
+    <mapper url="file:///Users/aixin/Desktop/tijcode/springStudy/springProject1.0/mybatisTest/src/main/java/com/xin/dao/UserMapper.xml"/>
+  </mappers>
+```
+
+```xml
+<!-- 使用映射器接口实现类的完全限定类名 需要配置文件名称和接口名称一致，并且位于同一目录下 -->
+<mappers>
+    <mapper class = "com.xin.dao.UserMapper"/>
+</mappers>
+```
+
+```xml
+<!-- 将包内的映射器接口实现全部注册为映射器 但是需要配置文件名称和接口名称一致，并且位于同一目录下 -->
+<mappers>
+  <package name="com.xin.dao"/>
+</mappers>
+```
+
+**mapper文件：**
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+        
+<mapper namespace="com.xin.dao.UserMapper">
+  
+  <select id="getAllUsers" resultType="user">
+    select * from user;
+  </select>
+  
+</mapper>
+```
+
+- namespace:命名空间。绑定接口类。
+- sql方法标签中的ID要与绑定的接口的方法保持一致。
+
+### 3.2、其他配置
+
+完整的setting配置：
+
+```xml
+<settings>
+  <setting name="cacheEnabled" value="true"/>
+  <setting name="lazyLoadingEnabled" value="true"/>
+  <setting name="multipleResultSetsEnabled" value="true"/>
+  <setting name="useColumnLabel" value="true"/>
+  <setting name="useGeneratedKeys" value="false"/>
+  <setting name="autoMappingBehavior" value="PARTIAL"/>
+  <setting name="autoMappingUnknownColumnBehavior" value="WARNING"/>
+  <setting name="defaultExecutorType" value="SIMPLE"/>
+  <setting name="defaultStatementTimeout" value="25"/>
+  <setting name="defaultFetchSize" value="100"/>
+  <setting name="safeRowBoundsEnabled" value="false"/>
+  <setting name="mapUnderscoreToCamelCase" value="false"/>
+  <setting name="localCacheScope" value="SESSION"/>
+  <setting name="jdbcTypeForNull" value="OTHER"/>
+  <setting name="lazyLoadTriggerMethods" value="equals,clone,hashCode,toString"/>
+</settings>
+```
+
+### 3.3、作用域与生命周期
+
+![image-20210302163312890](/Users/aixin/Library/Application Support/typora-user-images/image-20210302163312890.png)
+
+作用域理解：
+
+- SqlSessionFactoryBuilder的作用在于创建SqlSessionFactory，创建成功后SqlSessionFactoryBuilder 就失去了作用，所以它就只应该存在与创建SqlSessionFactory的方法中，而不要长期存在。因此**SqlSessionFactoryBuilder实例的最佳作用域是方法作用域（局部方法变量）。**
+- SqlSessionFactory 可以被认为是一个数据库连接池，它的作用是创建 SqlSession 接口对象。因为MyBatis 的本质就是 Java 对数据库的操作，所以 SqlSessionFactory 的生命周期存在于整个MyBatis 的应用之中，所以一旦创建了 SqlSessionFactory，就要长期保存它，直至不再使用MyBatis 应用，所以可以认为SqlSessionFactory 的生命周期就等同于 MyBatis 的应用周期。
+- 由于 SqlSessionFactory 是一个对数据库的连接池，所以它占据着数据库的连接资源。如果创建多个 SqlSessionFactory，那么就存在多个数据库连接池，这样不利于对数据库资源的控制，也会导致数据库连接资源被消耗光，出现系统宕机等情况，所以尽量避免发生这样的情况。因此在一般的应用中我们往往希望 SqlSessionFactory 作为一个单例，让它在应用中被共享。所以说 **SqlSessionFactory** **的最佳作用域是应用作用域。**
+- 如果说 SqlSessionFactory 相当于数据库连接池，那么 SqlSession 就相当于一个数据库连接（Connection 对象），你可以在一个事务里面执行多条 SQL，然后通过它的 commit、rollback等方法，提交或者回滚事务。所以它应该存活在一个业务请求中，处理完整个请求后，应该关闭这条连接，让它归还给SqlSessionFactory，否则数据库资源就很快被耗费精光，系统就会瘫痪，所以用 try...catch...finally... 语句来保证其正确关闭。**所以 SqlSession 的最佳的作用域是请求或方法作用域**。
+
+![image-20210302164729870](/Users/aixin/Library/Application Support/typora-user-images/image-20210302164729870.png)
+
+## 4.ResultMap
+
+解决的问题：类字段与数据库表的字段名不一致。
+
+搭建环境：把之前的环境复制过来，然后把实体类的字段修改为和数据库表不一致
+
+查询后的接口该字段数据为null
+
+<img src="/Users/aixin/Library/Application Support/typora-user-images/image-20210302173913346.png" alt="image-20210302173913346" style="zoom:50%;" />
+
+分析原因：
+
+- select * from user where id = #{id} 可以看做
+  select id,name,pwd from user where id = #{id}
+- mybatis会根据这些查询的列名(会将列名转化为小写,数据库不区分大小写) , 去对应的实体类中查找
+  相应列名的set方法设值 , 由于找不到setPwd() , 所以password返回null ; 【自动映射】
+
+解决方法：
+
+方法一：为列名指定别名 , 别名和java实体类的属性名一致 。
+
+```xml
+<select id="getAllUsers" resultType="user">
+  select id,name,pwd as password from user;
+</select>
+```
+
+方法二：修改set方法，不推荐。
+
+```java
+
+//	public void setPassword(String password) {
+//		this.password = password;
+//	}
+	
+	public void setPwd(String password) {
+			this.password = password;
+	}
+```
+
+方法三：**使用结果集映射->ResultMap** 【推荐】
+
+```xml
+<!--column不做限制，可以为任意表的字段，而property须为type 定义的pojo属性-->
+<resultMap id="唯一的标识" type="映射的pojo对象">
+  <id column="表的主键字段，或者可以为查询语句中的别名字段" jdbcType="字段类型" property="映射pojo对象的主键属性" />
+  <result column="表的一个字段（可以为任意表的一个字段）" jdbcType="字段类型" property="映射到pojo对象的一个属性（须为type定义的pojo对象中的一个属性）"/>
+  <association property="pojo的一个对象属性" javaType="pojo关联的pojo对象">
+    <id column="关联pojo对象对应表的主键字段" jdbcType="字段类型" property="关联pojo对象的主席属性"/>
+    <result  column="任意表的字段" jdbcType="字段类型" property="关联pojo对象的属性"/>
+  </association>
+  <!-- 集合中的property须为oftype定义的pojo对象的属性-->
+  <collection property="pojo的集合属性" ofType="集合中的pojo对象">
+    <id column="集合中pojo对象对应的表的主键字段" jdbcType="字段类型" property="集合中pojo对象的主键属性" />
+    <result column="可以为任意表的字段" jdbcType="字段类型" property="集合中的pojo对象的属性" />  
+  </collection>
+</resultMap>
+```
+
+```xml
+<resultMap type="com.xin.beans.User" id="userMap">
+  <id column="id" property="id"/>
+  <result column="name" property="name"/>
+  <result column="pwd" property="password"/>
+</resultMap>
+
+<select id="getAllUsers" resultMap="userMap">
+ select * from user;
+</select>
+```
 
