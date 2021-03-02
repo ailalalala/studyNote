@@ -597,3 +597,48 @@ public class User
 </select>
 ```
 
+如果世界总是这么简单就好了。但是肯定不是的，数据库中，存在一对多，多对一的情况，我们之后会使用到一些高级的结果集映射，association，collection这些，我们将在之后讲解，今天你们需要把这些知识都消化掉才是最重要的！理解结果集映射的这个概念！
+
+## 5.分页
+
+### 5.1、日志
+
+Mybatis内置的日志工厂提供日志功能，具体的日志实现有以下几种工具：
+
+- SLF4J
+- Apache Commons Logging
+- Log4j 2
+- Log4j
+- JDK logging
+
+具体选择哪个日志实现工具由MyBatis的内置日志工厂确定。它会使用最先找到的（按上文列举的顺序查找）。 如果一个都未找到，日志功能就会被禁用。
+
+**标准日志实现**
+
+```xml
+<settings>
+    <setting name="logImpl" value="STDOUT_LOGGING"/>
+</settings>
+```
+
+输出结果：
+
+<img src="C:\Users\aixin\AppData\Roaming\Typora\typora-user-images\image-20210302220000214.png" alt="image-20210302220000214" style="zoom: 80%;" />
+
+### 5.2、Log4J
+
+- Log4j是Apache的一个开源项目
+- 通过使用Log4j，我们可以控制日志信息输送的目的地：控制台，文本，GUI组件....
+- 我们也可以控制每一条日志的输出格式；
+- 通过定义每一条日志信息的级别，我们能够更加细致地控制日志的生成过程。最令人感兴趣的就是，这些可以通过一个配置文件来灵活地进行配置，而不需要修改应用的代码。
+
+**使用方法:**
+
+导入jar包：
+
+
+
+
+
+
+
