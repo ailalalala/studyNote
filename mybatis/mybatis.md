@@ -621,9 +621,33 @@ Mybatis内置的日志工厂提供日志功能，具体的日志实现有以下�
 </settings>
 ```
 
-输出结果：
+注意点：该配置放的位置要按照核心配置的顺序，不然会报错。
 
-<img src="C:\Users\aixin\AppData\Roaming\Typora\typora-user-images\image-20210302220000214.png" alt="image-20210302220000214" style="zoom: 80%;" />
+控制台输出结果：
+
+```properties
+Logging initialized using 'class org.apache.ibatis.logging.stdout.StdOutImpl' adapter.
+PooledDataSource forcefully closed/removed all connections.
+PooledDataSource forcefully closed/removed all connections.
+PooledDataSource forcefully closed/removed all connections.
+PooledDataSource forcefully closed/removed all connections.
+Opening JDBC Connection
+Created connection 492079624.
+Setting autocommit to false on JDBC Connection [com.mysql.cj.jdbc.ConnectionImpl@1d548a08]
+==>  Preparing: select * from user; 
+==> Parameters: 
+<==    Columns: id, name, pwd
+<==        Row: 1, 艾新, aaabbb
+<==        Row: 2, 张三, abcdef
+<==        Row: 3, 李四, 987654
+<==      Total: 3
+User [id=1, name=艾新, password=aaabbb]
+User [id=2, name=张三, password=abcdef]
+User [id=3, name=李四, password=987654]
+Resetting autocommit to true on JDBC Connection [com.mysql.cj.jdbc.ConnectionImpl@1d548a08]
+Closing JDBC Connection [com.mysql.cj.jdbc.ConnectionImpl@1d548a08]
+Returned connection 492079624 to pool.
+```
 
 ### 5.2、Log4J
 
@@ -634,11 +658,83 @@ Mybatis内置的日志工厂提供日志功能，具体的日志实现有以下�
 
 **使用方法:**
 
-导入jar包：
+**导入jar包：**
 
+```xml
+<dependency> 
+		<groupId>log4j</groupId> 
+		<artifactId>log4j</artifactId> 
+		<version>1.2.17</version> 
+</dependency>
+```
 
+<span style="color:red;">不知道为什么用idea不能导入这个jar包？</span>
 
+**在resources文件夹中创建log4j.properties：**
 
+```properties
+#将等级为DEBUG的日志信息输出到console和file这两个目的地，console和file的定义在下 面的代码 
+log4j.rootLogger=DEBUG,console,file
 
+#控制台输出的相关设置
+log4j.appender.console = org.apache.log4j.ConsoleAppender
+log4j.appender.console.Target = System.out
+log4j.appender.console.Threshold=DEBUG
+log4j.appender.console.layout = org.apache.log4j.PatternLayout
+log4j.appender.console.layout.ConversionPattern=[%c]-%m%n
 
+#文件输出的相关设置
+log4j.appender.file = org.apache.log4j.RollingFileAppender
+log4j.appender.file.File=./log/mybatis.log
+log4j.appender.file.MaxFileSize=10mb
+log4j.appender.file.Threshold=DEBUG
+log4j.appender.file.layout=org.apache.log4j.PatternLayout
+log4j.appender.file.layout.ConversionPattern=[%p][%d{yy-MM-dd}][%c]%m%n
+
+#日志输出级别
+log4j.logger.org.mybatis=DEBUG
+log4j.logger.java.sql=DEBUG
+log4j.logger.java.sql.Statement=DEBUG
+log4j.logger.java.sql.ResultSet=DEBUG
+log4j.logger.java.sql.PreparedStatement=DEBUG
+```
+
+**在核心配置文件中设置：**
+
+```xml
+<settings>
+  	<setting name="logImpl" value="LOG4J"/>
+</settings>
+```
+
+**测试类中使用：**
+
+```java
+public class MyTest {
+
+	static Logger logger = Logger.getLogger(MyTest.class);
+	
+	@Test
+	public void selectTest() {
+		SqlSession sqlSession = MybatisUtils.getSession();
+		
+		UserMapper mapper = sqlSession.getMapper(UserMapper.class);
+		
+		List<User> users = mapper.getAllUsers();
+    
+		logger.info("info：进入selectTest方法"); 
+		logger.debug("debug：进入selectTest方法"); 
+		logger.error("error: 进入selectTest方法");
+    
+		for (User user : users) {
+			System.out.println(user);
+		}
+		
+		sqlSession.close();
+	}
+	
+}
+```
+
+### 5.3、limit实现分页
 
