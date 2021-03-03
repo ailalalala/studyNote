@@ -668,8 +668,6 @@ Returned connection 492079624 to pool.
 </dependency>
 ```
 
-<span style="color:red;">不知道为什么用idea不能导入这个jar包？</span>
-
 **在resources文件夹中创建log4j.properties：**
 
 ```properties
@@ -737,4 +735,78 @@ public class MyTest {
 ```
 
 ### 5.3、limit实现分页
+
+**为什么要使用分页:**
+
+如果查询大量数据的时候，我们往往使用分页进行查询，也就是每次处理小部分数据，这样对
+数据库压力就在可控范围内。
+
+**使用limit实现分页：**
+
+```sql
+#语法 
+SELECT * FROM table LIMIT stratIndex，pageSize 
+
+SELECT * FROM table LIMIT 5,10; // 检索记录行 6-15 
+
+// 检索记录行 96-last. #如果只给定一个参数，它表示返回最大的记录行数目： 
+SELECT * FROM table LIMIT 5;
+
+//检索前 5 个记录行 #换句话说，LIMIT n 等价于 LIMIT 0,n。
+```
+
+**使用步骤：**
+
+1.UserMapper接口添加方法
+
+```java
+//分页查询
+List<User> selectLimit(Map<String,Integer> map);
+```
+
+2.UserMapper.xml中实现
+
+```xml
+<select id="selectLimit" parameterType="map" resultMap="userMap">
+     select * from user limit #{start},#{size}
+</select>
+```
+
+注意：返回类型必须写。
+
+3.测试
+
+```java
+ @Test
+public void testLimit(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    UserMapper mapper = sqlSession.getMapper(UserMapper.class);
+    Map<String,Integer> map = new HashMap<String,Integer>();
+    map.put("start",1);
+    map.put("size",3);
+    List<User> users = mapper.selectLimit(map);
+    for (User user : users) {
+        System.out.println(user);
+    }
+    sqlSession.close();
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
