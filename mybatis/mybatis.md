@@ -794,19 +794,90 @@ public void testLimit(){
 
 
 
+### 5.4、RowBounds分页
 
+我们除了使用Limit在SQL层面实现分页，也可以使用RowBounds在Java代码层面实现分页。
 
+**在User Mapper中添加接口**
 
+```java
+List<User> selectRowBounds();
+```
 
+**在xml中实现**
 
+```xml
+<select id="selectRowBounds" resultType="user">
+    select * from user;
+</select>
+```
 
+**测试**
 
+```java
+@Test
+public void testRowBounds(){
+    SqlSession session = MybatisUtil.getSqlSession();
 
+    int currentPage = 2; //第几页
+    int pageSize = 2; //每页显示几个
+    RowBounds rowBounds = new RowBounds((currentPage- 1)*pageSize,pageSize);
+    List<User> users = session.selectList("selectRowBounds", null, rowBounds);
+    for (User user : users) {
+        System.out.println(user);
+    }
 
+    session.close();
+}
+```
 
+### 5.5、PageHelper
 
+外部插件
 
+1.导入jar包
 
+```xml
+<!-- https://mvnrepository.com/artifact/com.github.pagehelper/pagehelper -->
+<dependency>
+    <groupId>com.github.pagehelper</groupId>
+    <artifactId>pagehelper</artifactId>
+    <version>5.2.0</version>
+</dependency>
+```
 
+2.在核心配置文件中进行配置
 
+```xml
+<plugins>
+    <plugin interceptor="com.github.pagehelper.PageInterceptor">
+        <!-- 使用MySQL方言的分页 -->
+        <property name="helperDialect" value="mysql"/><!--如果使用mysql，这里value为mysql-->
+        <property name="pageSizeZero" value="true"/>
+    </plugin>
+</plugins>
+```
 
+注意：<plugins>标签要按照顺序写入，不然报错。
+
+3.测试使用
+
+```java
+@Test
+public void testPageHelper(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    UserMapper mapper = sqlSession.getMapper(UserMapper.class);
+    PageHelper.startPage(2,2);
+    List<User> users = mapper.sselectAllUsers();
+    PageInfo<User> userPageInfo = new PageInfo<User>(users);
+    System.out.println(userPageInfo.toString());
+    for (User user : userPageInfo.getList()) {
+        System.out.println(user);
+    }
+    sqlSession.close();
+}
+```
+
+**三种分页的区别：**
+
+limit分页是在sql查询的时候就进行分页了，rowBounds是把所有的结果都查询出来然后再进行分页处理，pagehelper原理就是limit分页。rowBounds分页为逻辑分页，pagehelper为物理分页。
