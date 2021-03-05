@@ -382,7 +382,7 @@ public class User
 
   环境（通过default指定）
 
-  ![image-20210301174311323](/Users/aixin/Library/Application Support/typora-user-images/image-20210301174311323.png)
+  ![image-20210301174311323](./mybatis.assets/image-20210301174311323.png)
 
 - 子元素节点：environment
 
@@ -515,7 +515,7 @@ public class User
 
 ### 3.3、作用域与生命周期
 
-![image-20210302163312890](/Users/aixin/Library/Application Support/typora-user-images/image-20210302163312890.png)
+![image-20210305173413918](./mybatis.assets/image-20210305173413918.png)
 
 作用域理解：
 
@@ -524,7 +524,7 @@ public class User
 - 由于 SqlSessionFactory 是一个对数据库的连接池，所以它占据着数据库的连接资源。如果创建多个 SqlSessionFactory，那么就存在多个数据库连接池，这样不利于对数据库资源的控制，也会导致数据库连接资源被消耗光，出现系统宕机等情况，所以尽量避免发生这样的情况。因此在一般的应用中我们往往希望 SqlSessionFactory 作为一个单例，让它在应用中被共享。所以说 **SqlSessionFactory** **的最佳作用域是应用作用域。**
 - 如果说 SqlSessionFactory 相当于数据库连接池，那么 SqlSession 就相当于一个数据库连接（Connection 对象），你可以在一个事务里面执行多条 SQL，然后通过它的 commit、rollback等方法，提交或者回滚事务。所以它应该存活在一个业务请求中，处理完整个请求后，应该关闭这条连接，让它归还给SqlSessionFactory，否则数据库资源就很快被耗费精光，系统就会瘫痪，所以用 try...catch...finally... 语句来保证其正确关闭。**所以 SqlSession 的最佳的作用域是请求或方法作用域**。
 
-![image-20210302164729870](/Users/aixin/Library/Application Support/typora-user-images/image-20210302164729870.png)
+![image-20210305173427629](./mybatis.assets/image-20210305173427629.png)
 
 ## 4.ResultMap
 
@@ -534,7 +534,7 @@ public class User
 
 查询后的接口该字段数据为null
 
-<img src="/Users/aixin/Library/Application Support/typora-user-images/image-20210302173913346.png" alt="image-20210302173913346" style="zoom:50%;" />
+![image-20210305173455946](./mybatis.assets/image-20210305173455946.png)
 
 分析原因：
 
@@ -772,7 +772,7 @@ List<User> selectLimit(Map<String,Integer> map);
 </select>
 ```
 
-注意：返回类型必须写。
+**注意：返回类型必须写。**
 
 3.测试
 
@@ -858,7 +858,7 @@ public void testRowBounds(){
 </plugins>
 ```
 
-注意：<plugins>标签要按照顺序写入，不然报错。
+**注意：<plugins>标签要按照顺序写入，不然报错。**
 
 3.测试使用
 
@@ -878,6 +878,89 @@ public void testPageHelper(){
 }
 ```
 
+**注意：xml中sselectAllUsers方法实现的sql语句后面不能加“；”，因为pagehelper是在该sql语句后拼接limit，如果添加";"则sql语句不正确。**
+
 **三种分页的区别：**
 
 limit分页是在sql查询的时候就进行分页了，rowBounds是把所有的结果都查询出来然后再进行分页处理，pagehelper原理就是limit分页。rowBounds分页为逻辑分页，pagehelper为物理分页。
+
+## 6.使用注解开发
+
+### 6.1、面向接口编程
+
+根本原因 : 解耦 , 可拓展 , 提高复用 , 分层开发中 , 上层不用管具体的实现 , 大家都遵守共同的标准, 使得开发变得容易 , 规范性更好
+
+**关于接口的理解：**
+
+- 接口从更深层次的理解就是，定义（规范、约束）与实现的分离
+- 接口的本身反应设计人员对系统的抽象理解
+
+面向对象是指，我们考虑问题时，以对象为单位，考虑它的属性及方法 .
+面向过程是指，我们考虑问题时，以一个具体的流程（事务过程）为单位，考虑它的实现 .
+接口设计与非接口设计是针对复用技术而言的，与面向对象（过程）不是一个问题.更多的体现就是
+对系统整体的架构
+
+### 6.2、使用注解开发
+
+sql的主要注解：
+
+@select()、@insert()、@update、@delete()
+
+注意：使用注解开发就不需要mapper.xml文件了。
+
+步骤：
+
+1.接口中编写方法与添加注解
+
+```java
+//查询
+@Select("select id,name,pwd as password from user")
+List<User> getAllUsers();
+```
+
+2.在核心配置文件中绑定
+
+```xml
+<mappers>
+  <mapper class = "com.xin.dao.UserMapper"/>
+</mappers>
+```
+
+3.测试
+
+```java
+@Test
+	public void test() {	
+		SqlSession session = MybatisUtils.getSession();
+		UserMapper mapper = session.getMapper(UserMapper.class);
+		List<User> users = mapper.getAllUsers();
+		for(User user:users) {
+			System.out.println(user);
+		}
+		session.close();
+	}
+```
+
+增删改
+
+```java
+@Insert("insert into user (id,name,pwd) values (#{id},#{name},#{password})")
+int create(User user);
+
+@Update("update user set name=#{name},pwd=#{password} where id = #{id}")
+int update(User user);
+
+@Delete("delete from user where id=#{id}")
+int delete(int id);
+```
+
+**注意：可以在此处设置增删改自动提交事务**
+
+```java
+//获取SqlSession连接
+public static SqlSession getSession(){
+    //添加true参数，设置sqlsession自动提交事务
+    return sqlSessionFactory.openSession(true);
+}
+```
+
