@@ -964,3 +964,236 @@ public static SqlSession getSession(){
 }
 ```
 
+### 6.3、关于@param，#与$的区别
+
+@param注解用于给方法的参数起一个名字
+
+- 再方法只有一个参数的情况可以不适用该参数
+- 方法有多个参数的时候必须加入@param注解
+
+#{}：占位符，即sql预编译，变量替换后会自动为对应的变量加上单引号''，可以防止sql注入。
+
+${}：拼接符，即sql拼接，变量替换后不会自动为对应的变量加上单引号''，不能方式sql注入。
+
+## 7.lombok的使用
+
+1.需要在idea中安装插件
+
+ File -> Setting -> Plugins 搜索Lombok，选择小辣椒那个插件点击安装然后重启idea。
+
+2.引入maven依赖
+
+```xml
+<!-- https://mvnrepository.com/artifact/org.projectlombok/lombok -->
+<dependency>
+    <groupId>org.projectlombok</groupId>
+    <artifactId>lombok</artifactId>
+    <version>1.18.12</version>
+</dependency>
+```
+
+3.在类中使用
+
+```java
+@Data
+public class Student {
+    private int id;
+    private String name;
+    private Teacher teacher;
+}
+```
+
+**lombok常用注解：**
+
+@Getter / @Setter
+  可以作用在类上和属性上，放在类上，会对所有的非静态(non-static)属性生成Getter/Setter方法，放在属性上，会对该属性生成Getter/Setter方法。并可以指定Getter/Setter方法的访问级别。
+
+@EqualsAndHashCode
+  默认情况下，会使用所有非瞬态(non-transient)和非静态(non-static)字段来生成equals和hascode方法，也可以指定具体使用哪些属性。
+
+@ToString
+  生成toString方法，默认情况下，会输出类名、所有属性，属性会按照顺序输出，以逗号分割。
+
+@NoArgsConstructor, @RequiredArgsConstructor and @AllArgsConstructor
+  无参构造器、部分参数构造器、全参构造器，当我们需要重载多个构造器的时候，Lombok就无能为力了。
+
+@Data
+  @ToString, @EqualsAndHashCode, 所有属性的@Getter, 所有non-final属性的@Setter和@RequiredArgsConstructor的组合，通常情况下，我们使用这个注解就足够了。
+
+## 8.多对一的处理
+
+多对一：
+
+采用学生与老师的关系，多个学生对应一个老师。
+
+### 8.1、数据库设计
+
+数据库表与数据语句
+
+```sql
+CREATE TABLE `teacher` (
+		`id` INT(10) NOT NULL,
+		`name` VARCHAR(30) DEFAULT NULL,
+		PRIMARY KEY (`id`)
+) ENGINE=INNODB DEFAULT CHARSET=utf8
+
+INSERT INTO teacher(`id`,`name`) VALUES(1,'老师1');
+
+CREATE TABLE `student`(
+		`id` INT(10) NOT NULL,
+		`name` VARCHAR(30) DEFAULT NULL,
+		`tid` INT(10) DEFAULT NULL,
+		PRIMARY KEY (`id`),
+		KEY `fktid` (`tid`),
+		CONSTRAINT `fktid` FOREIGN KEY (`tid`) REFERENCES `teacher` (`id`)
+) ENGINE=INNODB DEFAULT CHARSET=utf8
+
+
+INSERT INTO `student` (`id`, `name`, `tid`) VALUES ('1', '小明', '1'); 
+INSERT INTO `student` (`id`, `name`, `tid`) VALUES ('2', '小红', '1'); 
+INSERT INTO `student` (`id`, `name`, `tid`) VALUES ('3', '小张', '1'); 
+INSERT INTO `student` (`id`, `name`, `tid`) VALUES ('4', '小李', '1'); 
+INSERT INTO `student` (`id`, `name`, `tid`) VALUES ('5', '小王', '1');
+```
+
+
+
+### 8.2、搭建测试环境
+
+1.实体类
+
+学生类：
+
+```java
+@Data
+public class Student {
+    private int id;
+    private String name;
+    private Teacher teacher;
+}
+```
+
+老师类：
+
+```java
+@Data
+public class Teacher {
+    private int id;
+    private String name;
+}
+```
+
+2.接口
+
+学生接口：
+
+```java
+public interface StudentMapper {
+    
+}
+```
+
+
+
+老师接口：
+
+```java
+public interface TeacherMapper {
+    
+}
+```
+
+3.mapper.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.xin.dao.StudentMapper">
+
+</mapper>
+```
+
+```
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.xin.dao.TeacherMapper">
+
+</mapper>
+```
+
+### 8.3、按查询嵌套处理
+
+1.增加查询方法
+
+```java
+//查询所有学生
+public void selectAllStudent();
+```
+
+2.在对应的xml文件中进行实现
+
+```xml
+<select id="selectAllStudent" resultMap="studentMap">
+    select * from student
+</select>
+
+<resultMap id="studentMap" type="Student">
+    <association property="teacher" column="{id=tid}" javaType="teacher" select="getTeacher"></association>
+</resultMap>
+
+<select id="getTeacher" resultType="teacher">
+    select * from teacher where id = #{id}
+</select>
+```
+
+**注意点：**
+
+Student中存有Teacher对象，但是对应的数据库表中并没有对应的字段存储对象类型，所以需要使用resultMap进行重新配置。
+
+使用<association>来处理关系映射。property代表student类的属性名，javatype代表属性的java类型，column代表两个表关联的属性值，如果有多个可以使用column="{id=tid,name=tname}"这种方式，tid、tname必须在数据库表中有对应的字段。select表示的是对应的查询方法，通过关联属性进行映射对象的查找
+
+3.测试
+
+```java
+@Test
+public void test(){
+    SqlSession session = MybatisUtil.getSqlSession();
+
+    StudentMapper mapper = session.getMapper(StudentMapper.class);
+    List<Student> students = mapper.selectAllStudent();
+    for (Student student : students) {
+        System.out.println(student);
+    }
+
+    session.close();
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
