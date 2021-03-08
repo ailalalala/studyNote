@@ -1177,6 +1177,200 @@ public void test(){
 
 
 
+### 8.4、按结果嵌套查询
+
+1.mapper中添加方法
+
+```java
+///按照结果嵌套查询
+public List<Student> selectAllStudent2();
+```
+
+2.在mapper.xml文件中进行实现
+
+```xml
+<select id="selectAllStudent2" resultMap="studentMap2">
+    select s.id as sid,s.name as sname,t.name as tname,t.id as tid
+    from student s,teacher t
+    where s.tid = t.id
+</select>
+
+<resultMap id="studentMap2" type="student">
+    <id property="id" column="sid"/>
+    <result property="name" column="sname"/>
+    <association property="teacher" javaType="teacher">
+        <id property="id" column="tid"/>
+        <result property="name" column="tname"/>
+    </association>
+</resultMap>
+```
+
+3.测试
+
+```java
+@Test
+public void test2(){
+    SqlSession session = MybatisUtil.getSqlSession();
+
+    StudentMapper mapper = session.getMapper(StudentMapper.class);
+    List<Student> students = mapper.selectAllStudent2();
+    for (Student student : students) {
+        System.out.println(student);
+    }
+
+    session.close();
+}
+```
+
+**该方法为先将所有需要的字段数据查询出来，然后再resultMap里再进行组装。**
+
+==今天在测试的时候遇到了一个mybatis连接mysql的错误==
+
+```
+Public Key Retrieval is not allowed
+```
+
+原因与解决方法：
+
+![image-20210308211640079](mybatis.assets/image-20210308211640079.png)
+
+在mybatis-config.xml文件中，mysql的url中加入下面一行
+
+```
+&amp;allowPublicKeyRetrieval=true
+```
+
+小结：
+
+- 按查询嵌套相当于mysql的子查询
+- 按结果嵌套相当于mysql的连表查询
+
+## 9.一对多的处理
+
+一对多
+
+采用学生与老师的关系，一个老师对应多个学生
+
+### 9.1、数据库设计
+
+还是按照多对一中的数据库进行测试
+
+### 9.2、环境搭建
+
+student类：
+
+```java
+@Data //该注解将GET与Set方法，toString方法，有参、无参构造函数
+public class Student {
+    private int id;
+    private String name;
+    private int tid;
+}
+```
+
+teacher类：
+
+```java
+@Data
+public class Teacher {
+    private int id;
+    private String name;
+    private List<Student> students;
+}
+```
+
+其余配置与类同8
+
+### 9.3、按照结果嵌套处理
+
+1.teacherMapper增加查询方法
+
+```java
+public Teacher getTeacher(int id);
+```
+
+2.mapper.xml中进行实现
+
+```xml
+<select id="getTeacher" resultMap="teacherMap">
+    select t.name tname,t.id tid,s.id sid,s.name sname
+    from student s,teacher t
+    where s.tid = t.id and t.id= #{id}
+</select>
+
+<resultMap id="teacherMap" type="teacher">
+    <result property="id" column="tid"/>
+    <result property="name" column="tname"/>
+    <collection property="students" javaType="ArrayList" ofType="student">
+        <id property="id" column="sid"/>
+        <result property="name" column="sname"/>
+        <result property="tid" column="tid"/>
+    </collection>
+</resultMap>
+```
+
+**ofType与javaType：javaType代表指的是该标签配置的属性，如果为list可以省略。ofType指定的这个List所存放的javaBean的类型。**
+
+3.测试
+
+```java
+@Test
+public void test(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    TeacherMapper mapper = sqlSession.getMapper(TeacherMapper.class);
+    Teacher teacher = mapper.getTeacher(1);
+    System.out.println(teacher);
+    sqlSession.close();
+}
+```
+
+### 9.4、按查询嵌套处理
+
+1.teacherMapper增加查询方法
+
+```java
+public Teacher getTeacher2(int id);
+```
+
+2.mapper.xml中进行实现
+
+```xml
+<select id="getTeacher2" resultMap="teacherMap2">
+    select * from teacher where id=#{id1}
+</select>
+
+<resultMap id="teacherMap2" type="teacher">
+    <collection property="students" column="{tid = id}" ofType="student" javaType="ArrayList" select="getStudent"/>
+</resultMap>
+
+<select id="getStudent" resultType="student">
+    select * from student where tid=#{tid}
+</select>
+```
+
+**我认为在resultMap 的collection标签中的Column表示的是两个表之间关联的字段，需要使用数据库表中该字段将两个表进行关联起来。 column="{tid = id}" tid代表是在下面的查询语句中的参数名，id则为teacher表的id，该id与student的tid可以关联上。**
+
+3.测试
+
+```java
+@Test
+public void test2(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    TeacherMapper mapper = sqlSession.getMapper(TeacherMapper.class);
+    Teacher teacher = mapper.getTeacher2(1);
+    System.out.println(teacher);
+    sqlSession.close();
+}
+```
+
+**小结：**
+
+1.关联-association
+
+2.集合-collection
+
+3.association是用来一对一与多对一，collection是用来一对多的关联
+
 
 
 
