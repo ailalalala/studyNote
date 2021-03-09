@@ -1371,13 +1371,235 @@ public void test2(){
 
 3.association是用来一对一与多对一，collection是用来一对多的关联
 
+## 10.动态sql
+
+### 10.1、介绍
+
+动态sql：动态sql指的是根据不同的查询条件，生成不同的sql语句。
+
+```
+官网描述： 
+	MyBatis 的强大特性之一便是它的动态 SQL。如果你有使用 JDBC 或其它类似框架的经验，你 就能体会到根据不同条件拼接 SQL 语句的痛苦。例如拼接时要确保不能忘记添加必要的空格，还要注意 去掉列表最后一个列名的逗号。利用动态 SQL 这一特性可以彻底摆脱这种痛苦。 
+	虽然在以前使用动态 SQL 并非一件易事，但正是 MyBatis 提供了可以被用在任意 SQL 映射语 句中的强大的动态 SQL 语言得以改进这种情形。
+    动态 SQL 元素和 JSTL 或基于类似 XML 的文本处理器相似。在 MyBatis 之前的版本中，有 很多元素需要花时间了解。MyBatis 3 大大精简了元素种类，现在只需学习原来一半的元素便可。 MyBatis 采用功能强大的基于 OGNL 的表达式来淘汰其它大部分元素。
+------------------------------- 
+- if 
+- choose (when, otherwise) 
+- trim (where, set) 
+- foreach 
+-------------------------------
+```
+
+### 10.2、搭建环境
+
+1.新建一个数据库表：blog
+
+```sql
+CREATE TABLE `blog` ( 
+	`id` varchar(50) NOT NULL COMMENT '博客id', 
+	`title` varchar(100) NOT NULL COMMENT '博客标题', 
+	`author` varchar(30) NOT NULL COMMENT '博客作者', 
+	`create_time` datetime NOT NULL COMMENT '创建时间', 
+	`views` int(30) NOT NULL COMMENT '浏览量' 
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
+```
 
 
 
+2.创建java Bean
 
+```java
+@Data
+public class Blog {
 
+    private String id;
+    private String title;
+    private String author;
+    private Date createTime;
+    private int views;
 
+}
+```
 
+3.创建mapper与xml
+
+```java
+int addBlog(Blog blog);
+```
+
+```java
+<insert id="addBlog" parameterType="blog">
+    insert into blog (id, title, author, create_time, views)
+    values(#{id},#{title},#{author},#{createTime},#{views})
+</insert>
+```
+
+4.测试
+
+```java
+@Test
+public void addInitBlog() {
+    SqlSession session = MybatisUtil.getSqlSession();
+    BlogMapper mapper = session.getMapper(BlogMapper.class);
+    Blog blog = new Blog();
+    blog.setId("1");
+    blog.setTitle("Mybatis如此简单");
+    blog.setAuthor("狂神说");
+    blog.setCreateTime(new Date());
+    blog.setViews(9999);
+    mapper.addBlog(blog);
+    blog.setId("2");
+    blog.setTitle("Java如此简单");
+    mapper.addBlog(blog);
+    blog.setId("3");
+    blog.setTitle("Spring如此简单");
+    mapper.addBlog(blog);
+    blog.setId("4");
+    blog.setTitle("微服务如此简单");
+    mapper.addBlog(blog);
+    session.close();
+}
+```
+
+初始化数据完毕。记得要使用自动提交事务，如果没加则要显示的添加提交操作。
+
+### 10.3、if语句
+
+相当于java中的if判断。
+
+1.mapper方法
+
+```java
+List<Blog> selectBlogIf(Map map);
+```
+
+2.xml实现
+
+```xml
+<select id="selectBlogIf" parameterType="map" resultType="blog">
+    select * from blog where
+    <if test="title !=null">
+        title=#{title}
+    </if>
+    <if test="author != null">
+        and author=#{author}
+    </if>
+</select>
+```
+
+3.测试
+
+```java
+@Test
+public void testIf(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    BlogMapper mapper = sqlSession.getMapper(BlogMapper.class);
+    Map<String,Object> map = new HashMap<String,Object>();
+    map.put("title","Mybatis如此简单");
+    map.put("author","狂神说");
+    List<Blog> blogs = mapper.selectBlogIf(map);
+    for (Blog blog : blogs) {
+        System.out.println(blog);
+    }
+    sqlSession.close();
+}
+```
+
+**问题：如果title为空的话，该查询语句就会报错。因为sql语句为：**
+
+```
+Preparing: select * from blog where and author=?
+```
+
+接下来就使用where标签来解决此问题。
+
+### 10.4、where
+
+1.mapper方法
+
+```java
+List<Blog> selectBlogWhere(Map map);
+```
+
+2.xml实现
+
+```xml
+<select id="selectBlogWhere" parameterType="map" resultType="blog">
+    select * from blog
+    <where>
+        <if test="title !=null">
+            title=#{title}
+        </if>
+        <if test="author != null">
+            and author=#{author}
+        </if>
+    </where>
+</select>
+```
+
+3.测试
+
+```java
+@Test
+public void testWhere(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    BlogMapper mapper = sqlSession.getMapper(BlogMapper.class);
+    Map<String,Object> map = new HashMap<String,Object>();
+//        map.put("title","Mybatis如此简单");
+    map.put("author","狂神说");
+    List<Blog> blogs = mapper.selectBlogWhere(map);
+    for (Blog blog : blogs) {
+        System.out.println(blog);
+    }
+    sqlSession.close();
+}
+```
+
+添加where标签，可以将紧挨着where多余的and或or进行自动去除，使sql语句变得正确。
+
+### 10.5、set
+
+当在 update 语句中使用if标签时，如果前面的if没有执行，则或导致逗号多余错误。使用set标签可以将动态的配置 SET 关键字，并剔除追加到条件末尾的任何不相关的逗号。
+
+1.mapper方法
+
+```java
+int updateSet(Blog blog);
+```
+
+2.xml实现
+
+```xml
+<update id="updateSet" parameterType="blog">
+    update blog
+    <set>
+        <if test="title != null">
+            title=#{title},
+        </if>
+        <if test="author != null">
+            author=#{author}
+        </if>
+    </set>
+    where id=#{id}
+</update>
+```
+
+3.测试
+
+```java
+@Test
+public void testUpdateSet(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    BlogMapper mapper = sqlSession.getMapper(BlogMapper.class);
+    Blog blog = new Blog();
+    blog.setId("1");
+//        blog.setAuthor("aixin");
+    blog.setTitle("thinking in java");
+    mapper.updateSet(blog);
+
+    sqlSession.close();
+}
+```
 
 
 
