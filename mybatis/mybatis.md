@@ -1601,6 +1601,312 @@ public void testUpdateSet(){
 }
 ```
 
+### 10.6、choose
+
+choose标签相当于java中的switch语句，如果条件中满足一个那么接下来的条件就不会执行。
+
+1.mapper方法
+
+```java
+List<Blog> selectBlogChoose(Map map);
+```
+
+2.xml实现
+
+```xml
+<select id="selectBlogChoose" parameterType="map" resultType="blog">
+    select * from blog
+    <where>
+        <choose>
+            <when test="title != null">
+                title=#{title}
+            </when>
+            <when test="author!=null">
+                author=#{author}
+            </when>
+        </choose>
+    </where>
+</select>
+```
+
+3.测试
+
+```java
+@Test
+public void testChoose(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    BlogMapper mapper = sqlSession.getMapper(BlogMapper.class);
+    Map<String,Object> map = new HashMap<String,Object>();
+    map.put("title","Mybatis如此简单");
+    map.put("author","狂神说");
+    List<Blog> blogs = mapper.selectBlogChoose(map);
+    for (Blog blog : blogs) {
+        System.out.println(blog);
+    }
+    sqlSession.close();
+}
+```
+
+测试结果只使用了title查询条件，author条件并没有生效。
+
+### 10.7、sql片段
+
+当某些sql片段被重复使用的时候，可以抽离出为一个sql片段，减少重复工作。
+
+```xml
+<select id="selectBlogWhere" parameterType="map" resultType="blog">
+    select * from blog
+    <where>
+        <include refid="ifSql"/>
+    </where>
+</select>
+
+<sql id="ifSql">
+    <if test="title !=null">
+        title=#{title}
+    </if>
+    <if test="author != null">
+        and author=#{author}
+    </if>
+</sql>
+```
+
+### 10.8、foreach
+
+1.mapper方法
+
+```java
+List<Blog> selectBlogForeach(Map map);
+```
+
+2.xml实现
+
+```xml
+<select id="selectBlogForeach" parameterType="map" resultType="blog">
+    select * from blog
+    <where>
+        <foreach collection="ids" item="id" open="and (" close=")" separator="or">
+            id=#{id}
+        </foreach>
+    </where>
+</select>
+```
+
+**注意：如果open里的and与(之间没有空格，那么where语句将无法自动去除and**
+
+生成的sql语句如下：
+
+```
+==>  Preparing: select * from blog WHERE ( id=? or id=? )
+==> Parameters: 1(String), 2(String)
+```
+
+3.测试
+
+```java
+@Test
+public void testForeach(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    BlogMapper mapper = sqlSession.getMapper(BlogMapper.class);
+    List<String> ids = new LinkedList<String>();
+    ids.add("1");
+    ids.add("2");
+    Map<String,Object> map = new HashMap<String,Object>();
+    map.put("ids",ids);
+    List<Blog> blogs = mapper.selectBlogForeach(map);
+    for (Blog blog : blogs) {
+        System.out.println(blog);
+    }
+    sqlSession.close();
+}
+```
+
+foreach为for循环，collection表示为列表的名称，item表示为每次遍历生成的对象，open为开始遍历拼接的字符串，close为结束遍历时拼接的字符串，separator为连接各个循环之间的分隔符。
+
+## 11.缓存
+
+### 11.1、简介
+
+1.什么是缓存（cache）：
+
+- 存在内存中的临时数据
+
+2.为什么使用缓存
+
+- 将用户经常查询的数据放在缓存（内存）中，用户查询数据就不用从数据库查询，从缓存中查询减少和数据库交互的次数，减少系统开销，提高系统效率。
+
+3.什么样的数据可以使用缓存
+
+经常查询并且不经常修改的数据
+
+
+
+mybatis包含了一个非常强大的查询缓存特性，它可以非常方便的定制和配置缓存。缓存可以极大的提高查询效率
+
+mybatis定义了两级缓存：一级缓存与二级缓存
+
+### 11.2、一级缓存
+
+![image-20210310203204480](mybatis.assets/image-20210310203204480.png)
+
+一级缓存默认开始，不需要任何配置。使用sqlsession第一次查询后，mybatis会将此次查询放入缓存中，如果缓存没有被关闭或者刷新，当下一次查询与第一次查询一致的时候会直接从一级缓存中获取数据。
+
+测试：
+
+```java
+@Test
+public void testCache(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    BlogMapper mapper = sqlSession.getMapper(BlogMapper.class);
+    Blog blog1 = mapper.selectById("1");
+    System.out.println(blog1);
+    System.out.println("===============================================");
+    Blog blog2 = mapper.selectById("1");
+    System.out.println(blog2);
+    System.out.println(blog1 == blog2);
+    sqlSessio.close();
+}
+```
+
+输出结果：
+
+![image-20210310203950421](mybatis.assets/image-20210310203950421.png)
+
+结果表明第二次查询并没有再次连接数据库进行查询，而且两个数据引用地址都是一样的。
+
+**一级缓存的生命周期：**
+
+1. MyBatis在开启一个数据库会话时，会 创建一个新的SqlSession对象，SqlSession对象中会有一个新的Executor对象。Executor对象中持有一个新的PerpetualCache对象；当会话结束时，SqlSession对象及其内部的Executor对象还有PerpetualCache对象也一并释放掉。
+2. 如果SqlSession调用了close()方法，会释放掉一级缓存PerpetualCache对象，一级缓存将不可用。
+3. 如果SqlSession调用了clearCache()，会清空PerpetualCache对象中的数据，但是该sqlsession对象仍可使用。
+4. SqlSession中执行了任何一个update操作(update()、delete()、insert()) ，都会清空PerpetualCache对象的数据，但是该sqlsession对象可以继续使用
+
+### 11.3、二级缓存
+
+![image-20210310204718700](mybatis.assets/image-20210310204718700.png)
+
+二级缓存为application级别的，它可以提高对数据库查询的效率，以提高应用的性能。
+
+二级缓存并不是对整个Application就只有一个Cache缓存对象，它将缓存划分的更细，即是mapper级别的：
+
+1.为每一个mapper分配一个cache缓存对象（使用<cache>节点配置）
+
+![image-20210310205339281](mybatis.assets/image-20210310205339281.png)
+
+上述的每一个cache对象，都会有自己所属的namespace命名空间，并且会将mapper的namespace作为它们的id
+
+
+
+2.多个mapper共用一个cache缓存对象（使用<cache-ref>节点配置）
+
+![image-20210310205503725](mybatis.assets/image-20210310205503725.png)
+
+
+
+使用：
+
+==使用二级缓存必须将实体类实现序列化接口==
+
+1.java bean
+
+```java
+@Data
+public class Blog implements Serializable {
+
+    private String id;
+    private String title;
+    private String author;
+    private Date createTime;
+    private int views;
+
+}
+```
+
+
+
+2.在配置文件中进行配置
+
+mybatis-config.xml
+
+```xml
+<settings>
+	//日志
+    <setting name="logImpl" value="STDOUT_LOGGING"/>
+    //驼峰命名
+    <setting name="mapUnderscoreToCamelCase" value="true"/>
+    //二级缓存开启
+    <setting name="cacheEnabled" value="true"/>
+</settings>
+```
+
+mapper.xml
+
+```xml
+<cache/>
+```
+
+或
+
+```xml
+<!--
+        eviction:代表的是缓存回收策略，目前MyBatis提供以下策略。
+        (1) LRU,最近最少使用的，一处最长时间不用的对象
+        (2) FIFO,先进先出，按对象进入缓存的顺序来移除他们
+        (3) SOFT,软引用，移除基于垃圾回收器状态和软引用规则的对象
+        (4) WEAK,弱引用，更积极的移除基于垃圾收集器状态和弱引用规则的对象。这里采用的是LRU，
+                移除最长时间不用的对形象
+
+        flushInterval:刷新间隔时间，单位为毫秒，这里配置的是100秒刷新，如果你不配置它，那么当
+        SQL被执行的时候才会去刷新缓存。
+
+        size:引用数目，一个正整数，代表缓存最多可以存储多少个对象，不宜设置过大。设置过大会导致内存溢出。
+        这里配置的是1024个对象
+
+        readOnly:只读，意味着缓存数据只能读取而不能修改，这样设置的好处是我们可以快速读取缓存，缺点是我们没有
+        办法修改缓存，他的默认值是false，不允许我们修改
+    -->
+<cache eviction="LRU" flushInterval="100000" readOnly="true" size="1024"/>
+```
+
+测试代码：
+
+```java
+@Test
+public void testCache(){
+    SqlSession sqlSession = MybatisUtil.getSqlSession();
+    SqlSession sqlSession2 = MybatisUtil.getSqlSession();
+    BlogMapper mapper = sqlSession.getMapper(BlogMapper.class);
+    BlogMapper mapper2 = sqlSession2.getMapper(BlogMapper.class);
+    Blog blog1 = mapper.selectById("1");
+    System.out.println(blog1);
+    System.out.println("===============================================");
+    Blog blog2 = mapper.selectById("1");
+    System.out.println(blog2);
+    System.out.println(blog1 == blog2);
+    sqlSession.close();
+    Blog blog3 = mapper2.selectById("1");
+    System.out.println(blog3);
+    System.out.println(blog1 == blog3);
+    sqlSession2.close();
+}
+```
+
+测试结果：
+
+![image-20210310210729558](mybatis.assets/image-20210310210729558.png)
+
+第二次比对结果为false原因是，mybatis将查询的数据从一级缓存放在了二级缓存中，所以物理地址发生了变化。
+
+查询的数据默认先放在一级缓存中，只有会话提交或者关闭以后，一级缓存中的数据才会转到二级缓存中。
+
+查询顺序：二级缓存 -----> 一级缓存 ----->数据库
+
+
+
+
+
+
+
 
 
 
