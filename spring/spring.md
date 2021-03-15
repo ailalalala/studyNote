@@ -168,25 +168,418 @@ Spring容器在初始化时先读取配置文件，根据配置文件或元数�
 
 
 
+## 3.hello spring
+
+先导入相关依赖
+
+```xml
+<!-- https://mvnrepository.com/artifact/org.springframework/spring-webmvc -->
+<dependency>
+    <groupId>org.springframework</groupId>
+    <artifactId>spring-webmvc</artifactId>
+    <version>5.3.4</version>
+</dependency>
+```
 
 
 
+### 3.1、新建bean
+
+```java
+public class Hello {
+
+    private String id;
+    private String name;
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+
+### 3.2、编写beans.xml
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+        https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="hello" class="com.xin.beans.Hello">
+        <property name="name" value="haha"/>
+    </bean>
+
+</beans>
+```
+
+### 3.3、测试
+
+```java
+public class MyTest {
+
+    @Test
+    public void test(){
+        ApplicationContext context = new ClassPathXmlApplicationContext("beans.xml");
+        Hello hello = context.getBean("hello", Hello.class);
+        System.out.println(hello.getName());
+    }
+
+}
+```
+
+### 总结：
+
+hello对象是由spring容器创建并为属性赋值的。这个过程就叫做控制反转，对象由spring容器进行管理。
 
 
 
+## 4.IOC创建对象方式
 
+### 4.1、通过无参构造器来创建
 
+在上一列子中在无参构造器中添加输入方法。
 
+```java
+public Hello(String name){
+    System.out.println("无参构造器");
+}
+```
 
+再次进行测试的时候发现控制台输出了语句。说明spring中通过<property>赋值时是使用无参构造器来进行创建对象的。所以在使用此标签赋值的类必须有无参构造器（如果只显示的添加有参构造器就会将无参构造器去除，所以如果添加了有参构造器也必须加入无参构造器）
 
+### 4.2、通过有参构造器来创建
 
+在类中加入有参构造器
 
+```java
+public Hello(String name){
+    this.name = name;
+    System.out.println("有参构造器");
+}
+```
 
+在beans.xml中进行配置
 
+```xml
+<!--    通过参数名来赋值-->
+<bean id="hello2" class="com.xin.beans.Hello">
+    <constructor-arg name="name" value="lala"/>
+</bean>
+<!--    通过参数类型来赋值-->
+<bean id="hello3" class="com.xin.beans.Hello">
+    <constructor-arg type="java.lang.String" value="lala"/>
+</bean>
+<!--    通过参数位置来赋值-->
+<bean id="hello4" class="com.xin.beans.Hello">
+    <constructor-arg index="0" value="lala"/>
+</bean>
+```
 
+测试
 
+```java
+ @Test
+public void test(){
+    ApplicationContext context = new ClassPathXmlApplicationContext("beans.xml");
+    Hello hello = context.getBean("hello2", Hello.class);
+    System.out.println(hello.getName());
+}
+```
 
+![image-20210315211543392](spring.assets/image-20210315211543392.png)
 
+在测试结果中可以看到，默认的将所有写在beans.xml中的对象都进行创建了。
+
+结论：在配置文件加载的时候。其中管理的对象都已经初始化了！
+
+## 5.spring配置
+
+### 5.1、别名
+
+```xml
+<!--    name代表配置已配置了bean的id，alias代表为此bean起的别名-->
+<alias name="hello" alias="helloAlias"/>
+```
+
+```java
+Hello hello = context.getBean("helloAlias", Hello.class);
+```
+
+### 5.2、bean的配置
+
+```xml
+<bean id="hello" name="hello11,hello22,hello33" class="com.xin.beans.Hello">
+    <property name="name" value="haha"/>
+</bean>
+```
+
+id代表了bean的唯一标识符，如果没有设置id，则name默认为标识符。如果配置了id，那么name就为该bean的别名，name里的内容可以有多个用“,”隔开。
+
+### 5.3、import
+
+可以导入其他的配置文件
+
+```xml
+<import resource="{path}/beans.xml"/>
+```
+
+## 6.依赖注入
+
+目录4已经大致的讲述了set方法注入与有参构造器注入。
+
+### 6.1、复杂类型注入
+
+1.建bean
+
+```java
+public class Bike {
+
+    private String color;
+
+    public String getColor() {
+        return color;
+    }
+
+    public void setColor(String color) {
+        this.color = color;
+    }
+
+    @Override
+    public String toString() {
+        return "Bike{" +
+                "color='" + color + '\'' +
+                '}';
+    }
+}
+```
+
+```java
+public class Student {
+
+    private String name;
+    private Integer age;
+    private Boolean isBoy;
+    private Bike bike;
+    private String[] books;
+    private List<String> hobbys;
+    private Map<String,String> achievement;
+    private Set<String> games;
+    private String wife;
+    private Properties info;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Integer getAge() {
+        return age;
+    }
+
+    public void setAge(Integer age) {
+        this.age = age;
+    }
+
+    public Boolean getBoy() {
+        return isBoy;
+    }
+
+    public void setBoy(Boolean boy) {
+        isBoy = boy;
+    }
+
+    public Bike getBike() {
+        return bike;
+    }
+
+    public void setBike(Bike bike) {
+        this.bike = bike;
+    }
+
+    public String[] getBooks() {
+        return books;
+    }
+
+    public void setBooks(String[] books) {
+        this.books = books;
+    }
+
+    public List<String> getHobbys() {
+        return hobbys;
+    }
+
+    public void setHobbys(List<String> hobbys) {
+        this.hobbys = hobbys;
+    }
+
+    public Map<String, String> getAchievement() {
+        return achievement;
+    }
+
+    public void setAchievement(Map<String, String> achievement) {
+        this.achievement = achievement;
+    }
+
+    public Set<String> getGames() {
+        return games;
+    }
+
+    public void setGames(Set<String> games) {
+        this.games = games;
+    }
+
+    public String getWife() {
+        return wife;
+    }
+
+    public void setWife(String wife) {
+        this.wife = wife;
+    }
+
+    public Properties getInfo() {
+        return info;
+    }
+
+    public void setInfo(Properties info) {
+        this.info = info;
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" +
+                "name='" + name + '\'' +
+                ", age=" + age +
+                ", isBoy=" + isBoy +
+                ", bike=" + bike +
+                ", books=" + Arrays.toString(books) +
+                ", hobbys=" + hobbys +
+                ", achievement=" + achievement +
+                ", games=" + games +
+                ", wife='" + wife + '\'' +
+                ", info=" + info +
+                '}';
+    }
+}
+```
+
+2.beans.xml
+
+常量注入
+
+```xml
+<bean id="student" class="com.xin.beans.Student">
+    <property name="name" value="john"/>
+    <property name="boy" value="true"/>
+    <property name="age" value="18"/>
+</bean>
+```
+
+引用注入
+
+```xml
+<bean id="bike" class="com.xin.beans.Bike">
+    <property name="color" value="黑色"/>
+</bean>
+```
+
+```xml
+<property name="bike" ref="bike"/>
+```
+
+数组
+
+```xml
+ <!--数组-->
+<property name="books">
+    <array>
+        <value>西游记</value>
+        <value>水浒传</value>
+    </array>
+</property>
+```
+
+列表
+
+```xml
+<!--列表-->
+<property name="hobbys">
+    <list>
+        <value>看书</value>
+        <value>玩游戏</value>
+    </list>
+</property>
+```
+
+map
+
+```xml
+<property name="achievement">
+    <map>
+        <entry key="数学" value="100"/>
+        <entry key="语文" value="100"/>
+    </map>
+</property>
+```
+
+set
+
+```xml
+<property name="games">
+    <set>
+        <value>LOL</value>
+        <value>CS</value>
+    </set>
+</property>
+```
+
+properties
+
+```xml
+<property name="info">
+    <props>
+        <prop key="学号">0001</prop>
+        <prop key="班级">一班</prop>
+    </props>
+</property>
+```
+
+null
+
+```xml
+<property name="wife"><null/></property>
+```
+
+### 6.2、p命名空间与c命名空间
+
+ 需要在头文件中假如约束文件
+
+```xml
+xmlns:p="http://www.springframework.org/schema/p"
+xmlns:c="http://www.springframework.org/schema/c"
+```
+
+```xml
+<bean id="student1" class="com.xin.beans.Student" p:name="lala" p:age="18"/>
+<bean id="student2" class="com.xin.beans.Student" c:name="lala" c:bike-ref="bike"/>
+```
+
+c命名空间必须在所配置的bean中加入有参构造器
 
 
 
