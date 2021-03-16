@@ -581,7 +581,198 @@ xmlns:c="http://www.springframework.org/schema/c"
 
 c命名空间必须在所配置的bean中加入有参构造器
 
+### 6.3、Bean的作用域
 
+在spring中，哪些组成应用程序的主体及由spring ioc容器所管理的对象，被称之为bean。bean就是IOC容器初始化、装配及管理的对象。
+
+<img src="spring.assets/image-20210316203805802.png" alt="image-20210316203805802" style="zoom:80%;" />
+
+request与session作用域仅基于web应用中使用。
+
+#### 6.3.1、singleton（单例）
+
+单例模式，当一个bean的作用域为singleton，那么spring ioc容器中只能存在一个共享的bean实例。就是在创建容器的时候就同时自动创建一个bean的对象，不管你是否使用，他都存在了，每次获取到的对象都是同一个对象。注意，Singleton作用域是Spring中的缺省作用域，默认就是单例模式，如果要显示的配置如下
+
+```xml
+<bean id="hello" name="hello11,hello22,hello33" class="com.xin.beans.Hello" scope="singleton">
+    <property name="name" value="haha"/>
+</bean>
+```
+
+测试：
+
+```java
+@Test
+public void testSingleton(){
+    ApplicationContext context = new ClassPathXmlApplicationContext("helloBeans.xml");
+    Hello hello= context.getBean("hello", Hello.class);
+    Hello hello1= context.getBean("hello", Hello.class);
+    System.out.println(hello == hello1);
+}
+```
+
+结果为true
+
+#### 6.3.2、prototype（原型类型）
+
+此作用域的bean对应多个对象实例，每次对该bean请求（将其注入到其他bean中或以程序的方式调用容器的getBean方法）的时候都会创建一个新的bean实例。    它在我们创建容器的时候并没有实例化，而是当我们获取bean的时候才会去创建一个对象，而且每次都是不同的对象。
+
+```xml
+<bean id="hello" name="hello11,hello22,hello33" class="com.xin.beans.Hello" scope="prototype">
+    <property name="name" value="haha"/>
+</bean>
+```
+
+再次使用上个测试结果为false。
+
+新版spring配置文件中好像不支持singleton="false"这种写法了，我自己测试的时候报错？
+
+#### 6.3.3、Request
+
+当一个bean的作用域为Request，表示在一次HTTP请求中，一个bean定义对应一个实例；即每个HTTP请求都会有各自的bean实例，它们依据某个bean定义创建而成。该作用域仅在基于web的SpringApplicationContext情形下有效。
+
+```xml
+<bean id="loginAction" class=cn.csdn.LoginAction" scope="request"/>
+```
+
+针对每次HTTP请求，Spring容器会根据loginAction bean的定义创建一个全新的LoginAction bean实例，且该loginAction bean实例仅在当前HTTP request内有效，因此可以根据需要放心的更改所建实例的内部状态，而其他请求中根据loginAction bean定义创建的实例，将不会看到这些特定于某个请求的状态变化。当处理请求结束，request作用域的bean实例将被销毁。
+
+#### 6.4.4、session
+
+当一个bean的作用域为Session，表示在一个HTTP Session中，一个bean定义对应一个实例。该作用域仅在基于web的Spring ApplicationContext情形下有效。
+
+```xml
+<bean id="userPreferences" class="com.foo.UserPreferences" scope="session"/>
+```
+
+针对某个HTTP Session，Spring容器会根据userPreferences bean定义创建一个全新的userPreferences bean实例，且该userPreferences bean仅在当前HTTP Session内有效。与request作用域一样，可以根据需要放心的更改所创建实例的内部状态，而别的HTTP Session中根据userPreferences创建的实例，将不会看到这些特定于某个HTTP Session的状态变化。当HTTP Session最终被废弃的时候，在该HTTP Session作用域内的bean也会被废弃掉。
+
+## 7.bean的自动装配
+
+- 自动装配是使用spring满足bean依赖的一种方法
+- spring会在应用上下文中为某个bean寻找其依赖的bean
+
+spring中bean有三种装配机制：
+
+1. 在xml中显示配置
+2. 在java中显示配置
+3. 隐式的bean发现机制和自动装配
+
+spring的自动装配需要从两个角度实现：
+
+1.组件扫面（component scanning）spring会自动发现应用上下文中所创建的bean
+
+2.自动装配（autoWiring）：spring自动满足bean之间的依赖，也就是IOC/DI
+
+### 7.1、测试环境搭建
+
+新建实体类
+
+```java
+public class Cat {
+    public void speak(){
+        System.out.println("miao~~~");
+    }
+}
+```
+
+```java
+public class Dog {
+    public void speak(){
+        System.out.println("wang~~~");
+    }
+}
+```
+
+```java
+public class Student {
+
+    private String name;
+    private Cat cat;
+    private Dog dog;
+    
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public Cat getCat() {
+        return cat;
+    }
+    public void setCat(Cat cat) {
+        this.cat = cat;
+    }
+    public Dog getDog() {
+        return dog;
+    }
+    public void setDog(Dog dog) {
+        this.dog = dog;
+    }
+}
+
+```
+
+编写配置文件
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="cat" class="com.xin.beans.Cat"/>
+    <bean id="dog" class="com.xin.beans.Dog"/>
+
+    <bean id="student" class="com.xin.beans.Student">
+        <property name="name" value="haha"/>
+        <property name="cat" ref="cat"/>
+        <property name="dog" ref="dog"/>
+    </bean>
+
+</beans>
+```
+
+测试
+
+```java
+@Test
+public void test(){
+    ApplicationContext context = new ClassPathXmlApplicationContext("beans.xml");
+    Student student = context.getBean("student", Student.class);
+    student.getCat().speak();
+    student.getDog().speak();
+}
+```
+
+### 7.2、byName
+
+按名称自动装配
+
+修改beans配置文件
+
+```xml
+<bean id="student" class="com.xin.beans.Student" autowire="byName">
+    <property name="name" value="haha"/>
+</bean>
+```
+
+byName是按照student类中的setCat、setDog方法去在IOC容器中查找名为cat、dog（获得将set去掉并且首字母小写的字符串）的bean，如果找到则进行装配，如果没有则报空指针异常。
+
+### 7.3、byType
+
+按照类型自动装配
+
+修改beans配置文件
+
+```xml
+<bean id="student" class="com.xin.beans.Student" autowire="byType">
+    <property name="name" value="haha"/>
+</bean>
+```
+
+byType必须保证同一类型的对象在spring容器中唯一。如果一个类型存在多个bean实例，则会报错。NoUniqueBeanDefinitionException
 
 
 
