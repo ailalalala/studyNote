@@ -103,7 +103,130 @@ HashSet底层实现就是HashMap，将值作为HashMap的Key进行存储而实�
 
 ## 2.多线程
 
-### 2.1、volatile
+### 2.1、多线程基础
+
+线程的操作方法：
+
+**join方法：**
+
+理解为只有调用join方法的线程执行完毕之后再执行主线程。
+
+下面例子只有当AA线程结束后才会执行main线程，如果去掉join方法那么主线程不会等待2秒钟。
+
+```java
+public class JoinTest implements Runnable{
+    @Override
+    public void run() {
+        System.out.println(Thread.currentThread().getName()+"开始执行");
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println(Thread.currentThread().getName()+"执行完毕");
+    }
+    public static void main(String[] args) throws InterruptedException {
+        JoinTest test = new JoinTest();
+        Thread thread = new Thread(test,"AA");
+        thread.start();
+        thread.join();
+        System.out.println("主线程运行");
+    }
+}
+```
+
+**sleep方法：**
+
+如果运行中的线程执行了sleep方法，那么回释放cpu资源sleep参数的毫秒数，因为此方法为线程的静态方法，所以该方法不会释放任何锁。**Sleep方法不会放弃 monitor 锁的所有权，会释放CPU资源。**
+
+```java
+Thread.sleep(2000);
+//也可以使用TimeUnit方法进行休眠
+TimeUnit.SECONDS.sleep(2);//HOURS,MINUTES,SECONDS,MILLISECONDS
+```
+
+例子证明sleep不释放锁：
+
+```java
+public class SleepTest implements Runnable{
+    private static final Object locker = new Object();
+    @Override
+    public void run() {
+        synchronized(locker){
+            System.out.println(Thread.currentThread().getName()+"开始运行");
+            try {
+                TimeUnit.SECONDS.sleep(2);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.println(Thread.currentThread().getName()+"运行结束");
+        }
+    }
+    public static void main(String[] args) throws InterruptedException {
+        SleepTest test = new SleepTest();
+        Thread thread = new Thread(test);
+        Thread thread2 = new Thread(test);
+        thread.start();
+        thread2.start();
+        TimeUnit.SECONDS.sleep(1);
+        System.out.println("main线程运行");
+    }
+}
+```
+
+运行结果：每次都是等到thread线程运行完毕才会运行thread2线程。但是main线程不会受影响该运行还是运行，因为main线程是一个jvm的线程，不需要持有SleepTest的locker锁才可以运行。
+
+**wait方法：**
+
+当我们调用wait方法的时候，它就进入道与该对象相关的等待池，同时释放对象锁，使得其他线程可以访问。直到另一线程调用notify或notifyAll方法来唤醒。
+
+例子说明wait方法释放锁：
+
+```java
+public class WaitTest{
+    private static Object locker = new Object();
+    public static void main(String[] args) throws InterruptedException {
+        WaitTest test = new WaitTest();
+        Thread thread = new Thread(()->{
+            try {
+                test.waitTest();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        },"AA");
+        Thread thread2 = new Thread(()->{
+            test.notifyTest();
+        },"BB");
+        thread.start();
+        TimeUnit.SECONDS.sleep(2);
+        thread2.start();
+    }
+    private static void waitTest() throws InterruptedException {
+        synchronized (locker){
+            System.out.println(Thread.currentThread().getName()+"开始等待");
+            locker.wait();
+            System.out.println(Thread.currentThread().getName()+"等待结束");
+        }
+    }
+    private static void notifyTest(){
+        synchronized (locker){
+            System.out.println(Thread.currentThread().getName()+"开始唤醒");
+            locker.notify();
+            System.out.println(Thread.currentThread().getName()+"唤醒结束");
+        }
+    }
+}
+```
+
+说明：waitTest与notifyTest方法，要使用同一锁进行wait与notify。并且在同步代码块中也要持有同一锁。
+
+**synchronized持有的各种锁：**
+
+
+
+
+
+### 2.2、volatile
 
 volitile：保证可见性，禁止指令重排，不保证原子性
 
@@ -187,7 +310,7 @@ public static void main(String[] args) {
 
 使用AtomicInteger来实现原子性的操作。
 
-### 2.2、单例模式现下的多线程问题
+### 2.3、单例模式现下的多线程问题
 
 ```java
 public class SingleDemo {
@@ -248,6 +371,6 @@ public static SingleDemo getSingleDemo(){
 
 在private static SingleDemo singleDemo;上添加volatile防止指令重排。
 
-### 2.3、CAS
+### 2.4、CAS
 
 cas：比较并交换
