@@ -774,6 +774,619 @@ byName是按照student类中的setCat、setDog方法去在IOC容器中查找名�
 
 byType必须保证同一类型的对象在spring容器中唯一。如果一个类型存在多个bean实例，则会报错。NoUniqueBeanDefinitionException
 
+### 7.4、使用注解
+
+Java5开始支持注解，spring2.5开始全面支持注解。
+
+使用注解开发需要在spring配置文件中配置头文件并开启注解支持属性
+
+```xml
+xmlns:context="http://www.springframework.org/schema/context"
+
+http://www.springframework.org/schema/context
+http://www.springframework.org/schema/context/spring-context.xsd
+
+<!--    开启注解支持-->
+<context:annotation-config/>
+```
+
+#### 7.4.1、@Autowired
+
+@Autowired是按照类型自动匹配的，不支持id匹配。需要导入spring-aop的包。
+
+1.修改student类
+
+```java
+public class Student {
+
+    private String name;
+    @Autowired
+    private Cat cat;
+    @Autowired
+    private Dog dog;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Cat getCat() {
+        return cat;
+    }
+
+    public Dog getDog() {
+        return dog;
+    }
+
+}
+```
+
+2.spring配置文件进行配置
+
+```xml
+<bean class="com.xin.beans.Cat"/>
+<bean class="com.xin.beans.Dog"/>
+<bean id="student" class="com.xin.beans.Student"/>
+```
+
+cat与dog类不添加id也可以自动匹配上
+
+3.测试通过。
+
+@Autowired(required=false) 说明： false，对象可以为null；true，对象必须存对象，不能为null。 默认为true，如果没有显示的改为false那么如果为null的话会报异常。
+
+#### 7.4.2、@Qualifier
+
+@Autowired是按照类型自动匹配的，加上@Qualifier则可以根据byName的方式进行自动装配，@Qualifier不能单独使用。
+
+1.先修改spring配置文件
+
+```xml
+<bean id="cat1" class="com.xin.beans.Cat"/>
+<bean id="dog1" class="com.xin.beans.Dog"/>
+<bean id="cat2" class="com.xin.beans.Cat"/>
+<bean id="dog2" class="com.xin.beans.Dog"/>
+<bean id="student" class="com.xin.beans.Student"/>
+```
+
+2.测试发现报错。
+
+3.添加@Qualifier注解
+
+```java
+private String name;
+@Autowired
+@Qualifier(value = "cat1")
+private Cat cat;
+@Autowired
+@Qualifier(value = "dog1")
+private Dog dog;
+```
+
+测试通过
+
+#### 7.4.3、@Resource
+
+@Resource默认按 byName自动注入罢了。@Resource有两个属性是比较重要的，分是name和type，Spring将@Resource注解的name属性解析为bean的名字，而type属性则解析为bean的类型。所以如果使用name属性，则使用byName的自动注入策略，而使用type属性时则使用byType自动注入策略。如果既不指定name也不指定type属性，这时将通过反射机制使用byName自动注入策略。
+
+@Resource装配顺序
+
+1. 如果同时指定了name和type，则从Spring上下文中找到唯一匹配的bean进行装配，找不到则抛出异常
+
+2. 如果指定了name，则从上下文中查找名称（id）匹配的bean进行装配，找不到则抛出异常
+
+3. 如果指定了type，则从上下文中找到类型匹配的唯一bean进行装配，找不到或者找到多个，都会抛出异常。**网上是这么说的但是经过我测试发现，如果找到多个那么会根据那么去匹配，如果都匹配不到则报异常。**
+
+4. 如果既没有指定name，又没有指定type，则自动按照byName方式进行装配；如果没有匹配，则回退为一个原始类型进行匹配，如果匹配则自动装配；
+
+```java
+@Resource(name = "dog1")
+private Dog dog;
+@Resource
+private Cat cat;
+@Resource(type = Cat.class)
+private Cat cat1;
+```
+
+### 7.5、小结
+
+@Autowired 与@Resource的区别：
+
+- @Autowired与@Resource都可以用来装配bean. 都可以写在字段上,或写在setter方法上。
+- @Autowired默认按类型装配（这个注解是属业spring的），如果通过类型无法匹配则按照名称进行自动装配。默认情况下必须要求依赖对象必须存在，如果要允许null值，可以设置它的required属性为false，如：@Autowired(required=false) ，如果我们想使用名称装配可以结合@Qualifier注解进行使用。
+- @Resource（这个注解属于J2EE的），默认按照名称进行装配，名称可以通过name属性进行指定，如果没有指定name属性，当注解写在字段上时，默认取字段名进行安装名称查找，如果注解写在setter方法上默认取属性名进行装配。当找不到与名称匹配的bean时才按照类型进行装配。但是需要注意的是，如果name属性一旦指定，就只会按照名称进行装配。
+
+## 8.使用注解开发
+
+在spring4之后，使用注解开发必须导入aop的包，然后在spring配置文件中加入头文件与注解支持（上面有）。
+
+### 8.1、Bean的实现
+
+1.首先配置扫面哪些包下的注解
+
+```xml
+<context:component-scan base-package="com.xin.beans"/>
+```
+
+2.在指定包下编写类
+
+```java
+@Component("dog")
+public class Dog {
+    public void speak(){
+        System.out.println("wang~~~");
+    }
+}
+```
+
+@Component("dog")相当于：<bean id="dog" class="com.xin.beans.Dog"/>
+
+3.测试。
+
+### 8.2、属性注入
+
+使用注解注入属性
+
+1.可以直接写在属性上
+
+```java
+@Component("student")
+public class Student {
+
+    @Value("aixin")
+    public String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+
+2.可以直接写在set方法上
+
+```java
+@Component("student")
+public class Student {
+
+    public String name;
+
+    public String getName() {
+        return name;
+    }
+    
+    @Value("aixin")
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+
+### 8.3、衍生注解
+
+@Component三个衍生注解
+
+为了更好的分层，spring可以使用其他三个注解，功能一样。
+
+- @Controller： web层
+- @Service：service层
+- @Repository：到层
+
+写上这些注解，就i相当于将这个类交给spring管理装配了。
+
+### 8.4、作用域
+
+@Scope
+
+- singleton：默认的，Spring会采用单例模式创建这个对象。关闭工厂 ，所有的对象都会销毁。
+- prototype：多例模式。关闭工厂 ，所有的对象不会销毁。内部的垃圾回收机制会回收
+
+```java
+@Component("student")
+@Scope("prototype")
+public class Student {
+
+    public String name;
+
+    public String getName() {
+        return name;
+    }
+
+    @Value("aixin")
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+
+### 8.5、基于java类进行配置
+
+JavaConfig 原来是 Spring 的一个子项目，它通过 Java 类的方式提供 Bean 的定义信息，在 Spring4 的版本， JavaConfig 已正式成为 Spring4 的核心功能 。
+
+1.编写实体类
+
+```java
+@Component("dog")
+public class Dog {
+    public void speak(){
+        System.out.println("wang~~~");
+    }
+}
+```
+
+2.编写配置类
+
+```java
+@Configuration//代表这是一个配置类
+public class MyConfig {
+    @Bean//通过方法注册一个bean，这里的返回值就Bean的类型，方法名就是bean的id！
+    public Dog dog(){
+        return new Dog();
+    }
+}
+```
+
+3.测试
+
+```java
+@Test
+public void test2(){
+    ApplicationContext context = new AnnotationConfigApplicationContext(MyConfig.class);
+    Dog dog = context.getBean("dog",Dog.class);
+    dog.speak();
+}
+```
+
+
+
+导入其他配置类
+
+```java
+@Configuration
+@Import(MyConfig.class)
+public class MyConfig2 {
+    
+}
+```
+
+## 9.代理模式
+
+代理（proxy）是一种设计模式，提供了对目标对象另外的访问方式，即通过代理对象访问目标对象，这样做的好处是可以在目标对象实现的基础上增强额外的功能操作，即扩展目标对象的功能，
+
+这里使用到编程中的一个思想，不要随意去修改别人已经写好的代码或者方法，如果需要修改可以通过代理的方式来扩展该方法。
+
+![image-20210320203432498](spring.assets/image-20210320203432498.png)
+
+### 9.1、静态代理
+
+静态代理在使用的时候，需要定义接口或者父类，被代理对象与 代理对象一起实现相同的接口或者是继承相同的父类。
+
+示例：
+
+1.接口
+
+```java
+public interface PersonService {
+    public void updatePerson();
+}
+```
+
+2.实现类与代理类
+
+```java
+public class PersonServiceImpl implements PersonService {
+    public void updatePerson() {
+        System.out.println("更改用户信息");
+    }
+}
+```
+
+```java
+public class PersonServiceImplProxy implements PersonService {
+    private PersonService target;
+    public PersonServiceImplProxy(PersonService target){
+        this.target = target;
+    }
+    public void updatePerson() {
+        System.out.println("代理前");
+        target.updatePerson();
+        System.out.println("代理后");
+    }
+}
+```
+
+3.测试
+
+```java
+@Test
+public void test(){
+    PersonService personService = new PersonServiceImpl();
+    PersonServiceImplProxy proxy = new PersonServiceImplProxy(personService);
+    proxy.updatePerson();
+}
+```
+
+静态代理就是将目标对象放入代理对象中，然后只想代理对象的方法，在执行了目标对象的方法时同时也加入了代理对象中的一些处理。
+
+静态代理：可以做到在不修改目标对象的功能前提下,对目标功能扩展.
+
+缺点：因为代理对象需要与目标对象实现一样的接口,所以会有很多代理类,类太多.同时,一旦接口增加方法,目标对象与代理对象都要维护。
+
+### 9.2、动态代理
+
+#### 9.2.1、接口动态代理
+
+java动态代理机制中有两个重要的类和接口InvocationHandler（接口）和Proxy（类），这一个类Proxy和接口InvocationHandler是我们实现动态代理的核心。
+
+1.InvocationHandler接口是proxy代理实例的调用处理程序实现的一个接口，每一个proxy代理实例都有一个关联的调用处理程序；在代理实例调用方法时，方法调用被编码分派到调用处理程序的invoke方法。
+
+每一个动态代理类的调用处理程序都必须实现InvocationHandler接口，并且每个代理类的实例都关联到了实现该接口的动态代理类调用处理程序中，当我们通过动态代理对象调用一个方法时候，这个方法的调用就会被转发到实现InvocationHandler接口类的invoke方法来调用，看如下invoke方法：
+
+```java
+  /**
+    * proxy:代理类代理的真实代理对象com.sun.proxy.$Proxy0
+    * method:我们所要调用某个对象真实的方法的Method对象
+    * args:指代代理对象方法传递的参数
+    */
+    public Object invoke(Object proxy, Method method, Object[] args)
+        throws Throwable;
+```
+
+2.Proxy类就是用来创建一个代理对象的类，它提供了很多方法，但是我们最常用的是newProxyInstance方法。
+
+```java
+public static Object newProxyInstance(ClassLoader loader,Class<?>[] interfaces, InvocationHandler h)
+```
+
+- loader：一个classloader对象，定义了由哪个classloader对象对生成的代理类进行加载
+- interfaces：一个interface对象数组，表示我们将要给我们的代理对象提供一组什么样的接口，如果我们提供了这样一个接口对象数组，那么也就是声明了代理类实现了这些接口，代理类就可以调用接口中声明的所有方法。
+- h：一个InvocationHandler对象，表示的是当动态代理对象调用方法的时候会关联到哪一个InvocationHandler对象上，并最终由其调用.
+
+示例：
+
+代理类：
+
+```java
+public class MyProxy implements InvocationHandler {
+
+    private Object target;
+
+    public MyProxy(Object target){
+        this.target = target;
+    }
+
+    public Object getProxy(){
+        return Proxy.newProxyInstance(this.getClass().getClassLoader(),target.getClass().getInterfaces(),this);
+    }
+
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        System.out.println("代理前");
+        Object invoke = method.invoke(target, args);
+        System.out.println("代理后");
+        return invoke;
+    }
+}
+```
+
+method.invoke里的参数为目标对象
+
+测试
+
+```java
+@Test
+public void test2(){
+    PersonService personService = new PersonServiceImpl();
+    MyProxy proxy = new MyProxy(personService);
+    PersonService proxyService = (PersonService) proxy.getProxy();
+    proxyService.updatePerson();
+}
+```
+
+#### 9.2.2、cglib动态代理(暂时不太懂)
+
+CGLIB是基于继承机制,继承被代理类,所以方法不要声明为final,通过重写父类方法达到增强类的作用
+
+1.导入cglib依赖
+
+```xml
+<!-- https://mvnrepository.com/artifact/cglib/cglib -->
+<dependency>
+    <groupId>cglib</groupId>
+    <artifactId>cglib</artifactId>
+    <version>3.3.0</version>
+</dependency>
+```
+
+2.编写方法类
+
+```java
+public class UserUtil {
+    public void update(){
+        System.out.println("更新成员");
+    }
+}
+```
+
+3.编写代理类
+
+```java
+public class CglibProxy implements MethodInterceptor {
+
+    private Object traget;
+
+    public CglibProxy(Object traget) {
+        this.traget = traget;
+    }
+
+    public Object createProxy(){
+        //创建加强器，用来创建动态代理类
+        Enhancer enhancer = new Enhancer();
+        //为加强器指定要代理的业务类（即：为下面生成的代理类指定父类）
+        enhancer.setSuperclass(traget.getClass());
+
+        //设置回调：对于代理类上所有方法的调用，都会调用CallBack，而Callback则需要实现intercept()方法进行拦
+        enhancer.setCallback(this);
+        return enhancer.create();
+    }
+
+    public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy) throws Throwable {
+        System.out.println("cglib代理");
+        Object result = methodProxy.invokeSuper(o, objects);
+        return result;
+    }
+
+}
+```
+
+4.测试
+
+```java
+@Test
+public void test3(){
+    UserUtil util = new UserUtil();
+    CglibProxy proxy = new CglibProxy(util);
+    //创建加强器，
+    UserUtil o = (UserUtil) proxy.createProxy();
+    o.update();
+}
+```
+
+底层是基于asm第三方框架,把代理对象类的class文件加载进来,通过修改其字节码生成新的子类来处理
+
+动态代理的好处：
+
+可以使得我们的真实角色更加纯粹 . 不再去关注一些公共的事情 .公共的业务由代理来完成 . 实现了业务的分工 ,公共业务发生扩展时变得更加集中和方便 .一个动态代理 , 一般代理某一类业务，一个动态代理可以代理多个类，代理的是接口！
+
+## 10.AOP
+
+### 10.1、什么是AOP
+
+AOP(Aspect Oriented Programming)意为：面向切面编程，通过预编译的方法和运行期动态代理的实现程序功能的统一维护的一种技术。大致意思就是统一管理可复用的部分，对纯业务的代码不进行修改，只在业务的代码被使用的时候做一些额外的操作。
+
+![image-20210322213753933](spring.assets/image-20210322213753933.png)
+
+### 10.2、AOP早spring中的作用
+
+提供声明式事务；允许用户自定义切面。
+
+- 横切关注点：与我们业务逻辑无关，但是我们需要关注额部分，就是横切关注点。如日志，安全，缓存，事务等等。。。
+- 切面(Aspect)：横切关注点被模块化的特殊对象，即它是一个类
+- 通知(Advice)：切面必须要完成的工作，即一个方法
+- 目标(Target)：被通知的对象
+- 代理(Proxy)：想目标对象应用通知之后创建的对象
+- 连接点(JointPoint)：与切入点匹配的执行点。典型的包括方法调用，对类成员的访问以及异常处理程序块的执行等等，它自身还可以嵌套其它 joint point。
+- 切入点(PointCut)：切面通知执行的地点的定义，也就是一组连接点。这些 joint point 或是通过逻辑关系组合起来，或是通过通配、正则表达式等方式集中起来，它定义了相应的 Advice 将要发生的地方。
+
+![image-20210322214248441](spring.assets/image-20210322214248441.png)
+
+在springAOP中，通过Advice定义横切逻辑，Spring中支持物种类型的Advice：
+
+<img src="spring.assets/image-20210322215257893.png" alt="image-20210322215257893" style="zoom:67%;" />
+
+### 10.3、aop的使用
+
+使用aop需要导入依赖
+
+```xml
+<!-- https://mvnrepository.com/artifact/org.aspectj/aspectjweaver -->
+<dependency>
+    <groupId>org.aspectj</groupId>
+    <artifactId>aspectjweaver</artifactId>
+    <version>1.9.6</version>
+</dependency>
+```
+
+#### 10.3.1、通过spring api实现
+
+1.建service与impl
+
+```java
+public interface UserService {
+    public void getUsers();
+    public void add();
+}
+```
+
+```java
+public class UserServiceImpl implements UserService {
+    public void getUsers(){
+        System.out.println("查询所有用户");
+    }
+    public void add(){
+        System.out.println("添加用户");
+    }
+}
+```
+
+2.编写切面
+
+```java
+public class BeforeLog implements MethodBeforeAdvice {
+    public void before(Method method, Object[] objects, Object o) throws Throwable {
+        System.out.println(o.getClass().getName()+"的"+method.getName()+"方法被执行了");
+    }
+}
+```
+
+```java
+public class AfterLog implements AfterReturningAdvice {
+    public void afterReturning(Object o, Method method, Object[] objects, Object o1) throws Throwable {
+        System.out.println(o1.getClass().getName()+"的"+method.getName()+"方法被执行完毕，返回结果为："+o);
+    }
+}
+```
+
+3.在spring配置文件中进行配置
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/aop
+                           http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <bean id="userService" class="com.xin.serviceImpl.UserServiceImpl"/>
+    <bean id="beforeLog" class="com.xin.aop.BeforeLog"/>
+    <bean id="afterLog" class="com.xin.aop.AfterLog"/>
+
+    <aop:config>
+        <!--切入点 expression:表达式匹配要执行的方法-->
+        <aop:pointcut id="pointcut" expression="execution(* com.xin.serviceImpl.UserServiceImpl.*(..))"/>
+        <!--执行环绕; advice-ref执行方法 . pointcut-ref切入点-->
+        <aop:advisor advice-ref="beforeLog" pointcut-ref="pointcut"/>
+        <aop:advisor advice-ref="afterLog" pointcut-ref="pointcut"/>
+    </aop:config>
+
+</beans>
+```
+
+需要加入头文件。
+
+4.测试
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
