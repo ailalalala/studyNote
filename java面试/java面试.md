@@ -627,3 +627,83 @@ public static SingleDemo getSingleDemo(){
 ### 2.4、CAS
 
 cas：比较并交换
+
+
+
+## 3.IO流
+
+### 3.1、IO
+
+![image-20210408214440396](java面试.assets/image-20210408214440396.png)
+
+
+
+### 3.2、序列化
+
+序列化：将对象写入到IO流当中
+
+反序列化：从IO流中恢复对象
+
+代码：
+
+```java
+public static void main(String[] args) throws IOException {
+    User user = new User();
+    user.setUserName("aixin");
+    user.setAge(18);
+    ObjectOutputStream objectOutputStream = new ObjectOutputStream (new FileOutputStream("user.txt"));
+    objectOutputStream.writeObject(user);
+}
+
+@Test
+public void test() throws IOException, ClassNotFoundException {
+    ObjectInputStream ois = new ObjectInputStream(new FileInputStream("user.txt"));
+    User user = (User)ois.readObject();
+    System.out.println(user);
+}
+```
+
+注意：
+
+User类必须实现Serializable接口。如果User里有其他对象类型的属性那么也该对象也必须实现Serializable接口。序列化生成文件是乱码形式的，是看不懂的。
+
+**transient**：用此关键字修饰的变量标明不会被持久化和修复。
+
+多次序列化必须序列化的位置与反序列化的位置一样，否则可能会有错误。
+
+```java
+@Test
+public void teacherTest() throws IOException{
+    User user = new User("路飞",18);
+    Teacher t1 = new Teacher("雷利",user);
+    Teacher t2 = new Teacher("香克斯",user);
+    ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream("teacher.dat"));
+    out.writeObject(user);
+    out.writeObject(t1);
+    out.writeObject(t2);
+    out.writeObject(t1);
+    out.flush();
+    out.close();
+}
+
+@Test
+public void teacherTest2() throws IOException, ClassNotFoundException {
+    ObjectInputStream in = new ObjectInputStream(new FileInputStream("teacher.dat"));
+    User user = (User)in.readObject();
+    Teacher t1 = (Teacher)in.readObject();
+    Teacher t2 = (Teacher)in.readObject();
+    Teacher t3 = (Teacher)in.readObject();
+    System.out.println(user);
+    System.out.println(t1);
+    System.out.println(t2);
+    System.out.println(t3);
+    System.out.println(t1 == t3);
+}
+```
+
+
+
+
+
+
+
