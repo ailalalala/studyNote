@@ -379,7 +379,7 @@ public static void main(String[] args) throws InterruptedException {
 
 
 
-#### 2.1.6、**synchronized：**
+#### 2.1.8、**synchronized：**
 
 synchronized有三种：
 
@@ -419,9 +419,65 @@ synchronized有三种：
 
   上面持有的是类锁，下面持有的是对象锁。
 
-synchronized实现原理：synchronized实现是基于jvm实现的，synchronized修饰方法在字节码中添加了一个ACC_SYNCHRONIZED的flags，同步代码块则是在同步的代码块前插入monitorenter，在同步代码块之后插入monitorexit。当线程执行到某个方法时，jvm会去检查方法的ACC_SYNCHRONIZED访问标志是否被设置，如果设置了那该线程就回去了这个对象对应的monitor对象，获取成功后再执行方法体，执行结束后释放monitor对象。代码块也是一样，遇到了monitorenter就获取monitor，遇到了monitorexit就释放monitor。
+synchronized实现原理：synchronized实现是基于jvm实现的，synchronized修饰方法在字节码中添加了一个ACC_SYNCHRONIZED的flags，同步代码块则是在同步的代码块前插入monitorenter，在同步代码块之后插入monitorexit。当线程执行到某个方法时，jvm会去检查方法的ACC_SYNCHRONIZED访问标志是否被设置，如果设置了那该线程就获取了这个对象对应的monitor对象，获取成功后再执行方法体，执行结束后释放monitor对象。代码块也是一样，遇到了monitorenter就获取monitor，遇到了monitorexit就释放monitor。
 
+monitor（对象监视器）：是有C++代码实现的。
 
+#### 2.1.9、死锁
+
+死锁就是多个线程在争夺资源的情况下造成互相等待的情况，如果没有外力驱动就会一直等待下去。
+
+代码：
+
+```java
+public class DeadLockTest {
+
+    private static Object resources1 = new Object();
+    private static Object resources2 = new Object();
+
+    public static void main(String[] args) {
+        new Thread(()->{
+            synchronized (resources1){
+                System.out.println(Thread.currentThread().getName()+"获取资源1");
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(Thread.currentThread().getName()+"开始获取资源2");
+                synchronized (resources2){
+                    System.out.println(Thread.currentThread().getName()+"获取资源2");
+                }
+                System.out.println(Thread.currentThread().getName()+"线程结束");
+            }
+        },"AA").start();
+        new Thread(()->{
+            synchronized (resources2){
+                System.out.println(Thread.currentThread().getName()+"获取资源2");
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                System.out.println(Thread.currentThread().getName()+"开始获取资源1");
+                synchronized (resources1){
+                    System.out.println(Thread.currentThread().getName()+"获取资源1");
+                }
+                System.out.println(Thread.currentThread().getName()+"线程结束");
+            }
+        },"BB").start();
+    }
+}
+```
+
+死锁的四个必要条件：
+
+- 互斥条件：同一时刻只能有一个线程获得该资源。
+- 请求和保持条件：一个线程因请求资源而发生堵塞的情况对已获得的资源保持不放
+- 不可剥夺条件：对于已获得的资源在没有用完之前不能被其他线程剥夺，只有用完之后才释放。
+- 循环等待条件：若干线程之间产生首尾相接的循环等待资源关系。
+
+防止死锁：只要破坏上述条件其中一条就不会产生死锁。
 
 ### 2.2、volatile
 
