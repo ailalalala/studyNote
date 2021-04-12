@@ -1,4 +1,4 @@
-# springBoot
+# 一、springBoot入门
 
 ## 1.了解springBoot
 
@@ -72,7 +72,7 @@ public class HelloController {
 
 运行 mvn clean package就可以生成可运行jar包。运行java -jar jar包名。就可以直接运行与访问了
 
-## 2.了解自动装配原理
+## 2.了解自动装配
 
 ### 2.1、springboot特点
 
@@ -534,3 +534,442 @@ public Car car(){
 ```
 
 也可以生效。
+
+## 3.自动配置原理入门
+
+### 3.1、引导加载自动配置类
+
+springBoot的核心就是@SpringBootApplication，拆开来也就是
+
+```java
+@SpringBootConfiguration
+@EnableAutoConfiguration
+@ComponentScan(
+    excludeFilters = {@Filter(
+    type = FilterType.CUSTOM,
+    classes = {TypeExcludeFilter.class}
+), @Filter(
+    type = FilterType.CUSTOM,
+    classes = {AutoConfigurationExcludeFilter.class}
+)}
+)
+```
+
+**将这些核心配置注解都一层一层的点进去看底层源码**
+
+#### 3.1.1、@SpringBootConfiguration
+
+```java
+@Target({ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Configuration
+public @interface SpringBootConfiguration {
+    @AliasFor(
+        annotation = Configuration.class
+    )
+    boolean proxyBeanMethods() default true;
+}
+```
+
+只有一个@Configuration注解，就是标明MainApplication就是spring中的一个配置类。
+
+#### 3.1.2、@ComponentScan
+
+就是指定扫描哪些，==可以参考spring的这个注解学习（未学）==
+
+#### 3.1.3、@EnableAutoConfiguration
+
+```java
+@AutoConfigurationPackage
+@Import({AutoConfigurationImportSelector.class})
+public @interface EnableAutoConfiguration {
+    String ENABLED_OVERRIDE_PROPERTY = "spring.boot.enableautoconfiguration";
+
+    Class<?>[] exclude() default {};
+
+    String[] excludeName() default {};
+}
+```
+
+**1.@AutoConfigurationPackage:自动配置包**
+
+```java
+@Import({Registrar.class})
+public @interface AutoConfigurationPackage {
+    String[] basePackages() default {};
+
+    Class<?>[] basePackageClasses() default {};
+}
+
+```
+
+就是给容器中导入了一个Registrar组件。==这里需要学习spring注解中@Import的高级用法，需要去学习。==
+
+利用Registrar给容器中导入一系列组件。
+
+```java
+static class Registrar implements ImportBeanDefinitionRegistrar, DeterminableImports {
+        Registrar() {
+        }
+
+        public void registerBeanDefinitions(AnnotationMetadata metadata, BeanDefinitionRegistry registry) {
+            AutoConfigurationPackages.register(registry, (String[])(new AutoConfigurationPackages.PackageImports(metadata)).getPackageNames().toArray(new String[0]));
+        }
+
+        public Set<Object> determineImports(AnnotationMetadata metadata) {
+            return Collections.singleton(new AutoConfigurationPackages.PackageImports(metadata));
+        }
+    }
+```
+
+AnnotationMetadata metadata表示的就是该注解所在的元信息，这里指的就是Main Application。
+
+(String[])(new AutoConfigurationPackages.PackageImports(metadata)).getPackageNames().toArray(new String[0])就是将这个主程序所在的包以及下面的子包下的所有组件都注册到IOC容器中。这也就能解释的通为什么springBoot默认的包路径就是这个。
+
+**2.@Import({AutoConfigurationImportSelector.class})**
+
+```java
+ public String[] selectImports(AnnotationMetadata annotationMetadata) {
+        if (!this.isEnabled(annotationMetadata)) {
+            return NO_IMPORTS;
+        } else {
+            AutoConfigurationImportSelector.AutoConfigurationEntry autoConfigurationEntry = this.getAutoConfigurationEntry(annotationMetadata);
+            return StringUtils.toStringArray(autoConfigurationEntry.getConfigurations());
+        }
+    }
+```
+
+```
+1.就是利用this.getAutoConfigurationEntry(annotationMetadata)这个方法给容器中批量的导入一些组件。
+2.然后调用List<String> configurations = this.getCandidateConfigurations(annotationMetadata, attributes);获取到所有需要导入容器中的配置类。
+3.利用工厂加载Map<String, List<String>> loadSpringFactories(ClassLoader classLoader) 得到所有的组件.
+	默认扫描我们当前系统里面所有META-INF/spring.factories位置的文件。
+	spring-boot-autoconfigure-2.4.4.jar包里面也有META-INF/spring.factories
+```
+
+使用debug将断点打到上面2的方法处，可以看到
+
+![image-20210412205702733](springBoot.assets/image-20210412205702733.png)
+
+spring-boot-autoconfigure-2.4.4.jar包中META-INF/spring.factories写死了springBoot已启动就要给容器中加载的所有配置类。
+
+```properties
+# Auto Configure
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+org.springframework.boot.autoconfigure.admin.SpringApplicationAdminJmxAutoConfiguration,\
+org.springframework.boot.autoconfigure.aop.AopAutoConfiguration,\
+org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration,\
+org.springframework.boot.autoconfigure.batch.BatchAutoConfiguration,\
+org.springframework.boot.autoconfigure.cache.CacheAutoConfiguration,\
+org.springframework.boot.autoconfigure.cassandra.CassandraAutoConfiguration,\
+org.springframework.boot.autoconfigure.context.ConfigurationPropertiesAutoConfiguration,\
+org.springframework.boot.autoconfigure.context.LifecycleAutoConfiguration,\
+org.springframework.boot.autoconfigure.context.MessageSourceAutoConfiguration,\
+org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration,\
+org.springframework.boot.autoconfigure.couchbase.CouchbaseAutoConfiguration,\
+org.springframework.boot.autoconfigure.dao.PersistenceExceptionTranslationAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.cassandra.CassandraDataAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.cassandra.CassandraReactiveDataAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.cassandra.CassandraReactiveRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.cassandra.CassandraRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.couchbase.CouchbaseDataAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.couchbase.CouchbaseReactiveDataAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.couchbase.CouchbaseReactiveRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.couchbase.CouchbaseRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchDataAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.elasticsearch.ElasticsearchRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.elasticsearch.ReactiveElasticsearchRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.elasticsearch.ReactiveElasticsearchRestClientAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.jdbc.JdbcRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.ldap.LdapRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.mongo.MongoReactiveDataAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.mongo.MongoReactiveRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.neo4j.Neo4jDataAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.neo4j.Neo4jReactiveDataAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.neo4j.Neo4jReactiveRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.neo4j.Neo4jRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.solr.SolrRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.r2dbc.R2dbcDataAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.r2dbc.R2dbcRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.rest.RepositoryRestMvcAutoConfiguration,\
+org.springframework.boot.autoconfigure.data.web.SpringDataWebAutoConfiguration,\
+org.springframework.boot.autoconfigure.elasticsearch.ElasticsearchRestClientAutoConfiguration,\
+org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration,\
+org.springframework.boot.autoconfigure.freemarker.FreeMarkerAutoConfiguration,\
+org.springframework.boot.autoconfigure.groovy.template.GroovyTemplateAutoConfiguration,\
+org.springframework.boot.autoconfigure.gson.GsonAutoConfiguration,\
+org.springframework.boot.autoconfigure.h2.H2ConsoleAutoConfiguration,\
+org.springframework.boot.autoconfigure.hateoas.HypermediaAutoConfiguration,\
+org.springframework.boot.autoconfigure.hazelcast.HazelcastAutoConfiguration,\
+org.springframework.boot.autoconfigure.hazelcast.HazelcastJpaDependencyAutoConfiguration,\
+org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration,\
+org.springframework.boot.autoconfigure.http.codec.CodecsAutoConfiguration,\
+org.springframework.boot.autoconfigure.influx.InfluxDbAutoConfiguration,\
+org.springframework.boot.autoconfigure.info.ProjectInfoAutoConfiguration,\
+org.springframework.boot.autoconfigure.integration.IntegrationAutoConfiguration,\
+org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration,\
+org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,\
+org.springframework.boot.autoconfigure.jdbc.JdbcTemplateAutoConfiguration,\
+org.springframework.boot.autoconfigure.jdbc.JndiDataSourceAutoConfiguration,\
+org.springframework.boot.autoconfigure.jdbc.XADataSourceAutoConfiguration,\
+org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration,\
+org.springframework.boot.autoconfigure.jms.JmsAutoConfiguration,\
+org.springframework.boot.autoconfigure.jmx.JmxAutoConfiguration,\
+org.springframework.boot.autoconfigure.jms.JndiConnectionFactoryAutoConfiguration,\
+org.springframework.boot.autoconfigure.jms.activemq.ActiveMQAutoConfiguration,\
+org.springframework.boot.autoconfigure.jms.artemis.ArtemisAutoConfiguration,\
+org.springframework.boot.autoconfigure.jersey.JerseyAutoConfiguration,\
+org.springframework.boot.autoconfigure.jooq.JooqAutoConfiguration,\
+org.springframework.boot.autoconfigure.jsonb.JsonbAutoConfiguration,\
+org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration,\
+org.springframework.boot.autoconfigure.availability.ApplicationAvailabilityAutoConfiguration,\
+org.springframework.boot.autoconfigure.ldap.embedded.EmbeddedLdapAutoConfiguration,\
+org.springframework.boot.autoconfigure.ldap.LdapAutoConfiguration,\
+org.springframework.boot.autoconfigure.liquibase.LiquibaseAutoConfiguration,\
+org.springframework.boot.autoconfigure.mail.MailSenderAutoConfiguration,\
+org.springframework.boot.autoconfigure.mail.MailSenderValidatorAutoConfiguration,\
+org.springframework.boot.autoconfigure.mongo.embedded.EmbeddedMongoAutoConfiguration,\
+org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration,\
+org.springframework.boot.autoconfigure.mongo.MongoReactiveAutoConfiguration,\
+org.springframework.boot.autoconfigure.mustache.MustacheAutoConfiguration,\
+org.springframework.boot.autoconfigure.neo4j.Neo4jAutoConfiguration,\
+org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,\
+org.springframework.boot.autoconfigure.quartz.QuartzAutoConfiguration,\
+org.springframework.boot.autoconfigure.r2dbc.R2dbcAutoConfiguration,\
+org.springframework.boot.autoconfigure.r2dbc.R2dbcTransactionManagerAutoConfiguration,\
+org.springframework.boot.autoconfigure.rsocket.RSocketMessagingAutoConfiguration,\
+org.springframework.boot.autoconfigure.rsocket.RSocketRequesterAutoConfiguration,\
+org.springframework.boot.autoconfigure.rsocket.RSocketServerAutoConfiguration,\
+org.springframework.boot.autoconfigure.rsocket.RSocketStrategiesAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.servlet.SecurityFilterAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.reactive.ReactiveSecurityAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.reactive.ReactiveUserDetailsServiceAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.rsocket.RSocketSecurityAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.saml2.Saml2RelyingPartyAutoConfiguration,\
+org.springframework.boot.autoconfigure.sendgrid.SendGridAutoConfiguration,\
+org.springframework.boot.autoconfigure.session.SessionAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.oauth2.client.reactive.ReactiveOAuth2ClientAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration,\
+org.springframework.boot.autoconfigure.security.oauth2.resource.reactive.ReactiveOAuth2ResourceServerAutoConfiguration,\
+org.springframework.boot.autoconfigure.solr.SolrAutoConfiguration,\
+org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration,\
+org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration,\
+org.springframework.boot.autoconfigure.thymeleaf.ThymeleafAutoConfiguration,\
+org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration,\
+org.springframework.boot.autoconfigure.transaction.jta.JtaAutoConfiguration,\
+org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.client.RestTemplateAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.embedded.EmbeddedWebServerFactoryCustomizerAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.reactive.HttpHandlerAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.reactive.ReactiveWebServerFactoryAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.reactive.WebFluxAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.reactive.error.ErrorWebFluxAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.reactive.function.client.ClientHttpConnectorAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.reactive.function.client.WebClientAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.servlet.DispatcherServletAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.servlet.ServletWebServerFactoryAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.servlet.error.ErrorMvcAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.servlet.HttpEncodingAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.servlet.MultipartAutoConfiguration,\
+org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration,\
+org.springframework.boot.autoconfigure.websocket.reactive.WebSocketReactiveAutoConfiguration,\
+org.springframework.boot.autoconfigure.websocket.servlet.WebSocketServletAutoConfiguration,\
+org.springframework.boot.autoconfigure.websocket.servlet.WebSocketMessagingAutoConfiguration,\
+org.springframework.boot.autoconfigure.webservices.WebServicesAutoConfiguration,\
+org.springframework.boot.autoconfigure.webservices.client.WebServiceTemplateAutoConfiguration
+```
+
+### 3.2、按需开启自动配置项
+
+虽然我们130个场景的所有自动配置启动的时候默认全部加载。但最终会按需进行配置。
+
+随便举个例子：
+
+![image-20210412210630186](springBoot.assets/image-20210412210630186.png)
+
+使用了条件装配的注解，在当前环境下就不会将此注册到容器中。
+
+springBoot会在底层默认配置好所有的组件，但是如果用户自己配置了以用户的优先。
+
+例子：
+
+```java
+@Bean
+@ConditionalOnMissingBean
+public CharacterEncodingFilter characterEncodingFilter() {
+    CharacterEncodingFilter filter = new OrderedCharacterEncodingFilter();
+    filter.setEncoding(this.properties.getCharset().name());
+    filter.setForceRequestEncoding(this.properties.shouldForce(org.springframework.boot.web.servlet.server.Encoding.Type.REQUEST));
+    filter.setForceResponseEncoding(this.properties.shouldForce(org.springframework.boot.web.servlet.server.Encoding.Type.RESPONSE));
+    return filter;
+}
+```
+
+springBoot底层的源码，使用了@ConditionalOnMissingBean表明如果容器中没有这个组件才会去进行创建注入。
+
+总结：
+
+- springBoot先加载所有的自动配置类，***AutoConfiguration
+
+- 每个自动配置类按照条件生效，默认都会绑定配置文件指定的值。***Properties里面拿。与对应.properties配置文件进行了绑定
+
+  ```java
+  @EnableConfigurationProperties({WebMvcProperties.class})
+  protected static class DispatcherServletConfiguration
+  ```
+
+- 生效的配置会给容器中装配很多组件，只要容器中有了这些组件就标明这些功能就有了
+
+- 只要用户有自己配置的，以用户的优先
+
+- 定制化配置：可以直接@Bean自己生成一个组件或者可以直接在配置文件中修改springBoot默认创建好的默认值
+
+## 4.开发小技巧
+
+### 4.1、lombok
+
+1.导入lombok依赖
+
+2.idea安装lombok插件
+
+然后直接在类上添加@Date,@toString...等注解就会直接在编译的时候帮助我们生成对应的getter、setter，toString等方法。
+
+### 4.2、dev-tools
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-devtools</artifactId>
+        <optional>true</optional>
+    </dependency>
+</dependencies>
+```
+
+修改项目后：ctrl+F9重启项目。没什么太大的用处。
+
+### 4.3、spring initializr
+
+使用idea或eclipse的这种创建项目的方式，然后选择需要的环境，就会把当前项目的结构与运行主程序都创建好。
+
+# 二、SpringBoot核心功能
+
+## 1.配置文件
+
+### 1.1、文件类型
+
+#### 1.1.1、properties
+
+是目前一直使用的配置文件类型。
+
+#### 1.1.2、 yaml
+
+非常适合用来做以数据为中心的配置文件
+
+1.基本语法
+
+- key: value;kv之间有空格
+- 大小写敏感
+- 使用缩进表示层级关系，缩进的空格数不重要，只要相同的层级元素左对齐即可
+- '#'表示注释
+- 字符串无需添加引号，如果要加，单引号字符串的内容表示会被转义，双引号不会被转义
+
+2.数据类型
+
+- 字面量：单个的。date,boolean,string,number,null
+
+  ```yaml
+  k: v
+  ```
+
+- 对象：键值对的集合。
+
+  ```yaml
+  k: {k1:v1,k2:v2}
+  #或
+  k:
+   k1: v1
+   k2: v2
+  ```
+
+- 数组：一组按次序排列的值
+
+  ```yaml
+  k: {v1,v2}
+  #或
+  k:
+   - v1
+   - v2
+  ```
+
+代码测试：
+
+```java
+@Data
+public class Pet {
+    private String petName;
+}
+```
+
+```java
+@ConfigurationProperties(prefix = "person")
+@Component
+@Data
+@ToString
+public class Person {
+    private String userName;
+    private Integer age;
+    private Boolean boss;
+    private Date birth;
+    private Pet pet;
+    private String[] interests;
+    private List<String> books;
+    private Map<String,Integer> score;
+    private Set<String> salarys;
+    private Map<String,List<Pet>> allPets;
+
+}
+```
+
+```yaml
+person:
+  userName: lala
+  age: 18
+  boss: true
+  birth: 1995/01/02
+  interests:
+    - 篮球
+    - 游戏
+  books: {Java虚拟机,thinkinginjava}
+  score:
+    english: 100
+    math: 100
+  salarys:
+    - 18000
+    - 19000
+  pet:
+    petName: 大黄
+  allPets:
+    cat:
+      - {petName:咪咪}
+      - petName: 花花
+    dog:
+      - petName: 大黄
+```
+
+==这个score不知道为什么key为中文就有问题？==
+
+
+
+
+
