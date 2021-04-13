@@ -969,6 +969,111 @@ person:
 
 ==这个score不知道为什么key为中文就有问题？==
 
+3.yaml自动补全
+
+需要在pom中添加依赖
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-configuration-processor</artifactId>
+    <optional>true</optional>
+</dependency>
+```
+
+然后重启项目，再次在yaml文件中就会有自动提示了。
+
+## 2.WEB开发
+
+### 2.1、简单功能分析
+
+#### 2.1.1、静态资源访问
+
+**1.静态资源目录**
+
+只要静态资源放在类路径下：`/static` (or `/public` or `/resources` or `/META-INF/resources`)
+
+访问：当前项目跟路径/文件名
+
+
+
+原理：默认静态映射/**，当请求进来的时候，先去找controller能不能处理，不能处理的所有请求又都交给静态资源处理器。静态资源处理器去静态资源目录里去查找，如果找不到就报404了。
+
+![image-20210413205517080](springBoot.assets/image-20210413205517080.png)
+
+
+
+
+
+**2.静态资源访问前缀**
+
+默认无前缀
+
+在yaml里可以进行修改
+
+```yaml
+spring:
+  mvc:
+    static-path-pattern: /res/**
+```
+
+访问路径是：localhost:8080/res/222.png才可以访问的到静态资源目录下的图片
+
+**3.修改静态资源目录**
+
+在yaml里可以进行修改
+
+```yaml
+spring:
+  web:
+    resources:
+      static-locations: classpath:/haha/
+```
+
+==这个`/META-INF/resources`文件夹下的静态资源还可以访问。不知道原因==
+
+webjar的静态资源文件放在了`/META-INF/resources`文件夹下。访问的时候可以直接访问的到，应该跟这个设置有什么关系。
+
+**4.webjar**
+
+就是将js与css一些页面打包为jar文件。
+
+https://www.webjars.org/
+
+```xml
+<dependency>
+    <groupId>org.webjars</groupId>
+    <artifactId>jquery</artifactId>
+    <version>3.6.0</version>
+</dependency>
+```
+
+访问地址：http://localhost:8080/webjars/jquery/3.6.0/jquery.js
+
+#### 2.1.2、欢迎页
+
+设置访问欢迎页：
+
+- 静态资源路径下放index.html
+
+  可以配置静态资源目录，但是如果重新设置了静态资源访问前缀就不会默认访问。
+
+- controller能处理/index
+
+
+
+#### 2.1.3、自定义Favicon
+
+就是浏览器页签上的小图标
+
+![image-20210413213940970](springBoot.assets/image-20210413213940970.png)
+
+找到自己喜欢的图标，然后取名为favicon.ico。将图标放到静态资源目录下，再次启动项目并访问就会生效了。
+
+注意点：如果添加了静态资源访问前缀会导致图标不生效。或者浏览器缓存问题。==我这没生效==
+
+
+
 
 
 
