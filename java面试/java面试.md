@@ -126,7 +126,7 @@ HashSet底层实现就是HashMap，将值作为HashMap的Key进行存储而实�
 
   
 
-![image-20210406215643186](java面试.assets/image-20210406215643186.png)
+ ![image-20210406215643186](java面试.assets/image-20210406215643186.png)
 
 加载机制就是当一个class文件要被加载时，会先在AppClassLodaer加载器中检查是否已经被加载过，如果被加载过则无需再加载了，如果没有则再继续向上查找，这样一层一层找，找到最上层的BootstrapClassLoader如果也没有被加载过则判断该加载器是否可以加载，如果不可以则找到下一级的加载器进行判断，这样一级一级向下进行判断，如果到AppClassLoader还是不能加载则抛出ClassNotFoundException。
 
@@ -731,23 +731,112 @@ Spring 官网列出的 Spring 的 6 个特征:
 - **Spring Web** : 为创建Web应用程序提供支持。
 - **Spring Test** : 提供了对 JUnit 和 TestNG 测试的支持。
 
+## 3.@Controller和@RestController
 
+**`@Controller` 返回一个页面**
 
+单独使用 `@Controller` 不加 `@ResponseBody`的话一般使用在要返回一个视图的情况，这种情况属于比较传统的Spring MVC 的应用，对应于前后端不分离的情况。
 
+ <img src="java面试.assets/image-20210416213532220.png" alt="image-20210416213532220" style="zoom: 67%;" />
 
+**`@RestController` 返回JSON 或 XML 形式数据**
 
+但`@RestController`只返回对象，对象数据直接以 JSON 或 XML 形式写入 HTTP 响应(Response)中，这种情况属于 RESTful Web服务，这也是目前日常开发所接触的最常用的情况（前后端分离）。
 
+ <img src="java面试.assets/image-20210416213556827.png" alt="image-20210416213556827" style="zoom:67%;" />
 
+**`@Controller +@ResponseBody` 返回JSON 或 XML 形式数据**
 
+如果你需要在Spring4之前开发 RESTful Web服务的话，你需要使用`@Controller` 并结合`@ResponseBody`注解，也就是说`@Controller` +`@ResponseBody`= `@RestController`（Spring 4 之后新加的注解）。
 
+> `@ResponseBody` 注解的作用是将 `Controller` 的方法返回的对象通过适当的转换器转换为指定的格式之后，写入到HTTP 响应(Response)对象的 body 中，通常用来返回 JSON 或者 XML 数据，返回 JSON 数据的情况比较多。
 
+ <img src="java面试.assets/image-20210416213613575.png" alt="image-20210416213613575" style="zoom:67%;" />
 
+## 4.spring ioc与aop
 
+**Spring AOP就是基于动态代理的**，如果要代理的对象，实现了某个接口，那么Spring AOP会使用**JDK Proxy**，去创建代理对象，而对于没有实现接口的对象，就无法使用 JDK Proxy 去进行代理了，这时候Spring AOP会使用**Cglib** ，这时候Spring AOP会使用 **Cglib** 生成一个被代理对象的子类来作为代理，如下图所示：
 
+ <img src="java面试.assets/image-20210416213827752.png" alt="image-20210416213827752" style="zoom: 80%;" />
 
+## 5.spring aop与 **AspectJ** aop
 
+**Spring AOP 属于运行时增强，而 AspectJ 是编译时增强。** Spring AOP 基于代理(Proxying)，而 AspectJ 基于字节码操作(Bytecode Manipulation)。
 
+Spring AOP 已经集成了 AspectJ ，AspectJ 应该算的上是 Java 生态系统中最完整的 AOP 框架了。AspectJ 相比于 Spring AOP 功能更加强大，但是 Spring AOP 相对来说更简单，
 
+如果我们的切面比较少，那么两者性能差异不大。但是，当切面太多的话，最好选择 AspectJ ，它比Spring AOP 快很多。
+
+> **AspectJ** aop需要额外学习
+
+## 6.springBean
+
+### 6.1、spring bean的作用域
+
+- singleton : 唯一 bean 实例，Spring 中的 bean 默认都是单例的。
+- prototype : 每次请求都会创建一个新的 bean 实例。
+- request : 每一次HTTP请求都会产生一个新的bean，该bean仅在当前HTTP request内有效。
+- session : 每一次HTTP请求都会产生一个新的 bean，该bean仅在当前 HTTP session 内有效。
+- global-session： 全局session作用域，仅仅在基于portlet的web应用中才有意义，Spring5已经没有了。Portlet是能够生成语义代码(例如：HTML)片段的小型Java Web插件。它们基于portlet容器，可以像servlet一样处理HTTP请求。但是，与 servlet 不同，每个 portlet 都有不同的会话
+
+### 6.2、springbean的单例安全的问题
+
+如果bean为单例的，那么如果多个线程去操作这一个bean的时候确实会出现线程安全的问题。
+
+但是，我们常用的@controller、@service、@dao这些bean是无状态的。无状态的bean不能保存数据，所以是线程安全的。
+
+常见的两种解决办法：
+
+1. 在类中定义一个 `ThreadLocal` 成员变量，将需要的可变成员变量保存在 `ThreadLocal` 中（推荐的一种方式）。
+2. 改变 Bean 的作用域为 “prototype”：每次请求都会创建一个新的 bean 实例，自然不会存在线程安全问题。
+
+### 6.3、@Component与@Bean
+
+1. 作用对象不同: `@Component` 注解作用于类，而`@Bean`注解作用于方法。
+2. `@Component`通常是通过类路径扫描来自动侦测以及自动装配到Spring容器中（我们可以使用 `@ComponentScan` 注解定义要扫描的路径从中找出标识了需要装配的类自动装配到 Spring 的 bean 容器中）。`@Bean` 注解通常是我们在标有该注解的方法中定义产生这个 bean,`@Bean`告诉了Spring这是某个类的示例，当我需要用它的时候还给我。
+3. `@Bean` 注解比 `Component` 注解的自定义性更强，而且很多地方我们只能通过 `@Bean` 注解来注册bean。比如当我们引用第三方库中的类需要装配到 `Spring`容器时，则只能通过 `@Bean`来实现。
+
+下面这个例子是通过@Component无法实现的
+
+```java
+@Bean
+public OneService getService(status) {
+    case (status)  {
+        when 1:
+                return new serviceImpl1();
+        when 2:
+                return new serviceImpl2();
+        when 3:
+                return new serviceImpl3();
+    }
+}
+```
+
+### 6.4、将一个类声明为spring中的bean的注解有哪些
+
+我们一般使用 `@Autowired` 注解自动装配 bean，要想把类标识成可用于 `@Autowired` 注解自动装配的 bean 的类,采用以下注解可实现：
+
+- `@Component` ：通用的注解，可标注任意类为 `Spring` 组件。如果一个Bean不知道属于哪个层，可以使用`@Component` 注解标注。
+- `@Repository` : 对应持久层即 Dao 层，主要用于数据库相关操作。
+- `@Service` : 对应服务层，主要涉及一些复杂的逻辑，需要用到 Dao层。
+- `@Controller` : 对应 Spring MVC 控制层，主要用于接受用户请求并调用 Service 层返回数据给前端页面
+
+### 6.5、spring中bean的生命周期
+
+- Bean 容器找到配置文件中 Spring Bean 的定义。
+- Bean 容器利用 Java Reflection API 创建一个Bean的实例。
+- 如果涉及到一些属性值 利用 `set()`方法设置一些属性值。
+- 如果 Bean 实现了 `BeanNameAware` 接口，调用 `setBeanName()`方法，传入Bean的名字。
+- 如果 Bean 实现了 `BeanClassLoaderAware` 接口，调用 `setBeanClassLoader()`方法，传入 `ClassLoader`对象的实例。
+- 与上面的类似，如果实现了其他 `*.Aware`接口，就调用相应的方法。
+- 如果有和加载这个 Bean 的 Spring 容器相关的 `BeanPostProcessor` 对象，执行`postProcessBeforeInitialization()` 方法
+- 如果Bean实现了`InitializingBean`接口，执行`afterPropertiesSet()`方法。
+- 如果 Bean 在配置文件中的定义包含 init-method 属性，执行指定的方法。
+- 如果有和加载这个 Bean的 Spring 容器相关的 `BeanPostProcessor` 对象，执行`postProcessAfterInitialization()` 方法
+- 当要销毁 Bean 的时候，如果 Bean 实现了 `DisposableBean` 接口，执行 `destroy()` 方法。
+- 当要销毁 Bean 的时候，如果 Bean 在配置文件中的定义包含 destroy-method 属性，执行指定的方法。
+
+<img src="java面试.assets/image-20210416221753333.png" alt="image-20210416221753333" style="zoom:80%;" />
 
 
 
