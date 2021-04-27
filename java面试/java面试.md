@@ -99,7 +99,26 @@ get：
 
 HashSet底层实现就是HashMap，将值作为HashMap的Key进行存储而实现不可重复性。HashMap的Value都为一个Object对象。
 
+#### 1.6.1、底层数据结构
 
+**List：**
+
+- `Arraylist`： `Object[]`数组
+- `Vector`：`Object[]`数组
+- `LinkedList`： 双向链表(JDK1.6 之前为循环链表，JDK1.7 取消了循环)
+
+**Set：**
+
+- `HashSet`（无序，唯一）: 基于 `HashMap` 实现的，底层采用 `HashMap` 来保存元素
+- `LinkedHashSet`：`LinkedHashSet` 是 `HashSet` 的子类，并且其内部是通过 `LinkedHashMap` 来实现的。有点类似于我们之前说的 `LinkedHashMap` 其内部是基于 `HashMap` 实现一样，不过还是有一点点区别的
+- `TreeSet`（有序，唯一）： 红黑树(自平衡的排序二叉树)
+
+**Map：**
+
+- `HashMap`： JDK1.8 之前 `HashMap` 由数组+链表组成的，数组是 `HashMap` 的主体，链表则是主要为了解决哈希冲突而存在的（“拉链法”解决冲突）。JDK1.8 以后在解决哈希冲突时有了较大的变化，当链表长度大于阈值（默认为 8）（将链表转换成红黑树前会判断，如果当前数组的长度小于 64，那么会选择先进行数组扩容，而不是转换为红黑树）时，将链表转化为红黑树，以减少搜索时间
+- `LinkedHashMap`： `LinkedHashMap` 继承自 `HashMap`，所以它的底层仍然是基于拉链式散列结构即由数组和链表或红黑树组成。另外，`LinkedHashMap` 在上面结构的基础上，增加了一条双向链表，使得上面的结构可以保持键值对的插入顺序。同时通过对链表进行相应的操作，实现了访问顺序相关逻辑。详细可以查看：[《LinkedHashMap 源码详细分析（JDK1.8）》](https://www.imooc.com/article/22931)
+- `Hashtable`： 数组+链表组成的，数组是 `HashMap` 的主体，链表则是主要为了解决哈希冲突而存在的
+- `TreeMap`： 红黑树（自平衡的排序二叉树）
 
 ### 1.7、双亲委派机制
 
@@ -132,9 +151,89 @@ HashSet底层实现就是HashMap，将值作为HashMap的Key进行存储而实�
 
 这样的加载的意义就是为了防止替换java的核心类。
 
+### 1.8、动态代理
+
+#### 1.8.1、jdk动态代理
+
+**在 Java 动态代理机制中 `InvocationHandler` 接口和 `Proxy` 类是核心。**
+
+```java
+public class MyProxy implements InvocationHandler {
+    private Object targetClass;
+    public MyProxy(Object targetClass){
+        this.targetClass = targetClass;
+    }
+    @Override
+    public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        System.out.println("代理对象做的一些准备工作");
+        Object invoke = method.invoke(targetClass, args);
+        System.out.println("代理对象做的一些后续工作");
+        return invoke;
+    }
+    public static Object getProxy(Object targetClass){
+        return Proxy.newProxyInstance(
+                targetClass.getClass().getClassLoader(),
+                targetClass.getClass().getInterfaces(),
+                new MyProxy(targetClass)
+        );
+    }
+}
+
+//使用
+SmsSendService smsSendService = (SmsSendService)MyProxy.getProxy(new SmsSendServiceImpl());
+smsSendService.senSms("啦啦啦");
+```
 
 
 
+#### 1.8.2、cglib代理
+
+**JDK 动态代理有一个最致命的问题是其只能代理实现了接口的类。**
+
+**为了解决这个问题，我们可以用 CGLIB 动态代理机制来避免。**
+
+[CGLIB](https://github.com/cglib/cglib)(*Code Generation Library*)是一个基于[ASM](http://www.baeldung.com/java-asm)的字节码生成库，它允许我们在运行时对字节码进行修改和动态生成。CGLIB 通过继承方式实现代理。很多知名的开源框架都使用到了[CGLIB](https://github.com/cglib/cglib)， 例如 Spring 中的 AOP 模块中：如果目标对象实现了接口，则默认采用 JDK 动态代理，否则采用 CGLIB 动态代理。
+
+**在 CGLIB 动态代理机制中 `MethodInterceptor` 接口和 `Enhancer` 类是核心。**
+
+```java
+public class MyProxyByCglib implements MethodInterceptor {
+    @Override
+    public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy) throws Throwable {
+        System.out.println("代理对象做的一些准备工作");
+        //注意，这里要使用methodProxy.invokeSuper
+        Object invoke = methodProxy.invokeSuper(o, objects);
+        System.out.println("代理对象做的一些后续工作");
+        return invoke;
+    }
+
+    public static Object getProxy(Class<?> clazz) {
+        // 创建动态代理增强类
+        Enhancer enhancer = new Enhancer();
+        // 设置类加载器
+        enhancer.setClassLoader(clazz.getClassLoader());
+        // 设置被代理类
+        enhancer.setSuperclass(clazz);
+        // 设置方法拦截器
+        enhancer.setCallback(new MyProxyByCglib());
+        // 创建代理类
+        return enhancer.create();
+    }
+}
+//使用
+SendEmail sendEmail = (SendEmail)MyProxyByCglib.getProxy(SendEmail.class);
+sendEmail.sendMessage("哈哈哈");
+```
+
+两种动态代理的对比：
+
+1. **JDK 动态代理只能只能代理实现了接口的类或者直接代理接口，而 CGLIB 可以代理未实现任何接口的类。** 另外， CGLIB 动态代理是通过生成一个被代理类的子类来拦截被代理类的方法调用，因此不能代理声明为 final 类型的类和方法。
+2. 就二者的效率来说，大部分情况都是 JDK 动态代理更优秀，随着 JDK 版本的升级，这个优势更加明显。
+
+静态代理与动态代理的对比：
+
+1. **灵活性** ：动态代理更加灵活，不需要必须实现接口，可以直接代理实现类，并且可以不需要针对每个目标类都创建一个代理类。另外，静态代理中，接口一旦新增加方法，目标对象和代理对象都要进行修改，这是非常麻烦的！
+2. **JVM 层面** ：静态代理在编译时就将接口、实现类、代理类这些都变成了一个个实际的 class 文件。而动态代理是在运行时动态生成类字节码，并加载到 JVM 中的。
 
 ## 2.多线程
 
@@ -1178,7 +1277,7 @@ Cache Aside Pattern 中遇到写请求是这样的：更新 DB，然后直接删
 mysql> show engines;
 ```
 
-## MyISAM 和 InnoDB 的区别
+## 1.MyISAM 和 InnoDB 的区别
 
 MySQL 5.5 之前，MyISAM 引擎是 MySQL 的默认存储引擎，可谓是风光一时。
 
@@ -1220,7 +1319,7 @@ MyISAM 不支持，而 InnoDB 支持。
 
 MVCC 可以看作是行级锁的一个升级，可以有效减少加锁操作，提供性能。
 
-## 锁机制与InnoDB锁算法
+## 2.锁机制与InnoDB锁算法
 
 - MyISAM采用的是表级锁(table-level locking)
 - InnoDb采用的是行级锁(row-level locking)
@@ -1236,9 +1335,68 @@ MVCC 可以看作是行级锁的一个升级，可以有效减少加锁操作，
 - Gap lock：间隙锁，锁定一个范围，不包括记录本身
 - Next-key lock：record+gap 锁定一个范围，包含记录本身
 
+## 3.事务
 
+事务是逻辑上的一组操作，要么都执行，要么都不执行。
 
+```mysql
+# 开启一个事务
+START TRANSACTION;
+# 多条 SQL 语句
+SQL1,SQL2...
+## 提交事务
+COMMIT;
+```
 
+关系型数据库都具有ACID特性。
 
+1. **原子性**（`Atomicity`） ： 事务是最小的执行单位，不允许分割。事务的原子性确保动作要么全部完成，要么完全不起作用；
+2. **一致性**（`Consistency`）： 执行事务前后，数据保持一致，例如转账业务中，无论事务是否成功，转账者和收款人的总额应该是不变的；
+3. **隔离性**（`Isolation`）： 并发访问数据库时，一个用户的事务不被其他事务所干扰，各并发事务之间数据库是独立的；
+4. **持久性**（`Durabilily`）： 一个事务被提交之后。它对数据库中数据的改变是持久的，即使数据库发生故障也不应该对其有任何影响。
 
+**数据事务的实现原理呢？**
+
+我们这里以 MySQL 的 InnoDB 引擎为例来简单说一下。
+
+MySQL InnoDB 引擎使用 **redo log(重做日志)** 保证事务的**持久性**，使用 **undo log(回滚日志)** 来保证事务的**原子性**。
+
+MySQL InnoDB 引擎通过 **锁机制**、**MVCC** 等手段来保证事务的隔离性（ 默认支持的隔离级别是 **`REPEATABLE-READ`** ）。
+
+保证了事务的持久性、原子性、隔离性之后，一致性才能得到保障。
+
+### 并发事务
+
+在典型的应用程序中，多个事务并发运行，经常会操作相同的数据来完成各自的任务（多个用户对同一数据进行操作）。并发虽然是必须的，但可能会导致以下的问题。
+
+- **脏读（Dirty read）:** 当一个事务正在访问数据并且对数据进行了修改，而这种修改还没有提交到数据库中，这时另外一个事务也访问了这个数据，然后使用了这个数据。因为这个数据是还没有提交的数据，那么另外一个事务读到的这个数据是“脏数据”，依据“脏数据”所做的操作可能是不正确的。
+- **丢失修改（Lost to modify）:** 指在一个事务读取一个数据时，另外一个事务也访问了该数据，那么在第一个事务中修改了这个数据后，第二个事务也修改了这个数据。这样第一个事务内的修改结果就被丢失，因此称为丢失修改。 例如：事务 1 读取某表中的数据 A=20，事务 2 也读取 A=20，事务 1 修改 A=A-1，事务 2 也修改 A=A-1，最终结果 A=19，事务 1 的修改被丢失。
+- **不可重复读（Unrepeatableread）:** 指在一个事务内多次读同一数据。在这个事务还没有结束时，另一个事务也访问该数据。那么，在第一个事务中的两次读数据之间，由于第二个事务的修改导致第一个事务两次读取的数据可能不太一样。这就发生了在一个事务内两次读到的数据是不一样的情况，因此称为不可重复读。
+- **幻读（Phantom read）:** 幻读与不可重复读类似。它发生在一个事务（T1）读取了几行数据，接着另一个并发事务（T2）插入了一些数据时。在随后的查询中，第一个事务（T1）就会发现多了一些原本不存在的记录，就好像发生了幻觉一样，所以称为幻读。
+
+SQL 标准定义了四个隔离级别：
+
+- **READ-UNCOMMITTED(读取未提交)：** 最低的隔离级别，允许读取尚未提交的数据变更，**可能会导致脏读、幻读或不可重复读**。
+- **READ-COMMITTED(读取已提交)：** 允许读取并发事务已经提交的数据，**可以阻止脏读，但是幻读或不可重复读仍有可能发生**。
+- **REPEATABLE-READ(可重复读)：** 对同一字段的多次读取结果都是一致的，除非数据是被本身事务自己所修改，**可以阻止脏读和不可重复读，但幻读仍有可能发生**。
+- **SERIALIZABLE(可串行化)：** 最高的隔离级别，完全服从 ACID 的隔离级别。所有的事务依次逐个执行，这样事务之间就完全不可能产生干扰，也就是说，**该级别可以防止脏读、不可重复读以及幻读**。
+
+ <img src="/Users/aixin/Desktop/u盘/java/studyNote/studyNote/java面试/java面试.assets/image-20210426165438049.png" alt="image-20210426165438049" style="zoom:60%;" />
+
+Mysql InnoDB引擎的默认隔离级别未RR
+
+```mysql
+mysql> SELECT @@tx_isolation;
++-----------------+
+| @@tx_isolation  |
++-----------------+
+| REPEATABLE-READ |
++-----------------+
+```
+
+SERIALIZABLE的隔离级别可防止幻读问题，但是RR的隔离级别还是会存在幻读问题，使用加锁可以解决该问题。
+
+```mysql
+select * from user where id = 1 for update;
+```
 
