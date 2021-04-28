@@ -62,7 +62,11 @@ i3 == i4;//true
 
 
 
-### 1.5、Collections常用方法
+### 1.6、容器
+
+![image-20210406164945031](./java面试.assets/image-20210406164945031.png)
+
+#### 1.6.1、Collections常用方法
 
 ```java
 Collections.sort(list);//排序
@@ -81,25 +85,9 @@ Collections.fill(list2, "替换");//替换集合中的所有元素，用对象ob
 Collections.nCopies(5, "哈哈");//生成一个指定大小与内容的集合
 ```
 
-### 1.6、容器
 
-![image-20210406164945031](./java面试.assets/image-20210406164945031.png)
 
-HashMap底层实现原理：数组+链表
-
-put：
-
-![image-20210406172425149](./java面试.assets/image-20210406172425149.png)
-
-关于第4步：会先判断单链表节点书是否达到了8，如果达到了8还会判断当前数组的容量是否达到了64，如果没有则扩容，如果是则转为红黑树
-
-get：
-
-![image-20210406172739780](./java面试.assets/image-20210406172739780.png)
-
-HashSet底层实现就是HashMap，将值作为HashMap的Key进行存储而实现不可重复性。HashMap的Value都为一个Object对象。
-
-#### 1.6.1、底层数据结构
+#### 1.6.2、底层数据结构
 
 **List：**
 
@@ -120,36 +108,100 @@ HashSet底层实现就是HashMap，将值作为HashMap的Key进行存储而实�
 - `Hashtable`： 数组+链表组成的，数组是 `HashMap` 的主体，链表则是主要为了解决哈希冲突而存在的
 - `TreeMap`： 红黑树（自平衡的排序二叉树）
 
-### 1.7、双亲委派机制
+#### 1.6.3、comparable与comparator区别
 
-我们在IDE中编写的Java源代码被编译器编译成**.class**的字节码文件。然后由我们得ClassLoader负责将这些class文件给加载到JVM中去执行。
+- `comparable` 接口实际上是出自`java.lang`包 它有一个 `compareTo(Object obj)`方法用来排序
 
-类的加载器类别：
-
-- BootstrapClassLoader（启动类加载器）：使用C++编写，加载核心库java.*，构造ExtClassLoader和AppClassLoader。开发则无法直接获取该加载器的引用。
+- `comparator`接口实际上是出自 java.util 包它有一个`compare(Object obj1, Object obj2)`方法用来排序
 
   ```java
-  String s = new String();
-  System.out.println(s.getClass().getClassLoader());//null
+  //comparator用法
+  Arrays.sort(T[],Comparator<? super T> c);
+  Collections.sort(List<T> list,Comparator<? super T> c);
   ```
 
-- ExtClassLoader（标准扩展类加载器）:主要负责加载jre/lib/ext目录下的一些扩展的jar。
+#### 1.6.4、Map接口
 
-- AppClassLoader（系统类加载器）:负责加载第三方与自己编写的类。
+##### 1.HashMap与HashTable的区别
 
-  ```java
-  System.out.println(User.class.getClassLoader());//sun.misc.Launcher$AppClassLoader@18b4aac2
-  System.out.println(User.class.getClassLoader().getParent());//sun.misc.Launcher$ExtClassLoader@4554617c
-  System.out.println(User.class.getClassLoader().getParent().getParent());//null
-  ```
+1. **线程是否安全：** `HashMap` 是非线程安全的，`HashTable` 是线程安全的,因为 `HashTable` 内部的方法基本都经过`synchronized` 修饰。（如果你要保证线程安全的话就使用 `ConcurrentHashMap` 吧！）；
+2. **效率：** 因为线程安全的问题，`HashMap` 要比 `HashTable` 效率高一点。另外，`HashTable` 基本被淘汰，不要在代码中使用它；
+3. **对 Null key 和 Null value 的支持：** `HashMap` 可以存储 null 的 key 和 value，但 null 作为键只能有一个，null 作为值可以有多个；HashTable 不允许有 null 键和 null 值，否则会抛出 `NullPointerException`。
+4. **初始容量大小和每次扩充容量大小的不同 ：** ① 创建时如果不指定容量初始值，`Hashtable` 默认的初始大小为 11，之后每次扩充，容量变为原来的 2n+1。`HashMap` 默认的初始化大小为 16。之后每次扩充，容量变为原来的 2 倍。② 创建时如果给定了容量初始值，那么 Hashtable 会直接使用你给定的大小，而 `HashMap` 会将其扩充为 2 的幂次方大小（`HashMap` 中的`tableSizeFor()`方法保证，下面给出了源代码）。也就是说 `HashMap` 总是使用 2 的幂作为哈希表的大小,后面会介绍到为什么是 2 的幂次方。
+5. **底层数据结构：** JDK1.8 以后的 `HashMap` 在解决哈希冲突时有了较大的变化，当链表长度大于阈值（默认为 8）（将链表转换成红黑树前会判断，如果当前数组的长度小于 64，那么会选择先进行数组扩容，而不是转换为红黑树）时，将链表转化为红黑树，以减少搜索时间。Hashtable 没有这样的机制。
 
-  
+##### 2.HashMap与HashSet的区别
 
- ![image-20210406215643186](java面试.assets/image-20210406215643186.png)
+|               `HashMap`                |                          `HashSet`                           |
+| :------------------------------------: | :----------------------------------------------------------: |
+|           实现了 `Map` 接口            |                       实现 `Set` 接口                        |
+|               存储键值对               |                          仅存储对象                          |
+|     调用 `put()`向 map 中添加元素      |             调用 `add()`方法向 `Set` 中添加元素              |
+| `HashMap` 使用键（Key）计算 `hashcode` | `HashSet` 使用成员对象来计算 `hashcode` 值，对于两个对象来说 `hashcode` 可能相同，所以` equals()`方法用来判断对象的相等性 |
 
-加载机制就是当一个class文件要被加载时，会先在AppClassLodaer加载器中检查是否已经被加载过，如果被加载过则无需再加载了，如果没有则再继续向上查找，这样一层一层找，找到最上层的BootstrapClassLoader如果也没有被加载过则判断该加载器是否可以加载，如果不可以则找到下一级的加载器进行判断，这样一级一级向下进行判断，如果到AppClassLoader还是不能加载则抛出ClassNotFoundException。
+##### 3.HsahMap与TreeMap的区别
 
-这样的加载的意义就是为了防止替换java的核心类。
+`TreeMap` 和`HashMap` 都继承自`AbstractMap` ，但是需要注意的是`TreeMap`它还实现了`NavigableMap`接口和`SortedMap` 接口。
+
+实现 `NavigableMap` 接口让 `TreeMap` 有了对集合内元素的搜索的能力。
+
+实现`SortMap`接口让 `TreeMap` 有了对集合中的元素根据键排序的能力。默认是按 key 的升序排序，不过我们也可以指定排序的比较器。
+
+**相比于`HashMap`来说 `TreeMap` 主要多了对集合中的元素根据键排序的能力以及对集合内元素的搜索的能力。**
+
+##### 4.HashSet如何检查重复
+
+当你把对象加入`HashSet`时，`HashSet` 会先计算对象的`hashcode`值来判断对象加入的位置，同时也会与其他加入的对象的 `hashcode` 值作比较，如果没有相符的 `hashcode`，`HashSet` 会假设对象没有重复出现。但是如果发现有相同 `hashcode` 值的对象，这时会调用`equals()`方法来检查 `hashcode` 相等的对象是否真的相同。如果两者相同，`HashSet` 就不会让加入操作成功。
+
+**`hashCode()`与 `equals()` 的相关规定：**
+
+1. 如果两个对象相等，则 `hashcode` 一定也是相同的
+2. 两个对象相等,对两个 `equals()` 方法返回 true
+3. 两个对象有相同的 `hashcode` 值，它们也不一定是相等的
+4. 综上，`equals()` 方法被覆盖过，则 `hashCode()` 方法也必须被覆盖
+5. `hashCode() `的默认行为是对堆上的对象产生独特值。如果没有重写 `hashCode()`，则该 class 的两个对象无论如何都不会相等（即使这两个对象指向相同的数据）。
+
+##### 5.HashMap底层实现
+
+当链表长度大于阈值（默认为 8）（将链表转换成红黑树前会判断，如果当前数组的长度小于 64，那么会选择先进行数组扩容，而不是转换为红黑树）时，将链表转化为红黑树，以减少搜索时间。
+
+<img src="/Users/aixin/Desktop/u盘/java/studyNote/studyNote/java面试/java面试.assets/image-20210428164601205.png" alt="image-20210428164601205" style="zoom:60%;" />
+
+HashMap底层实现原理：数组+链表
+
+put：
+
+![image-20210406172425149](./java面试.assets/image-20210406172425149.png)
+
+关于第4步：会先判断单链表节点书是否达到了8，如果达到了8还会判断当前数组的容量是否达到了64，如果没有则扩容，如果是则转为红黑树
+
+get：
+
+![image-20210406172739780](./java面试.assets/image-20210406172739780.png)
+
+HashSet底层实现就是HashMap，将值作为HashMap的Key进行存储而实现不可重复性。HashMap的Value都为一个Object对象。
+
+**HashMap的长度为什么是2的幂次方：**
+
+为了能让 HashMap 存取高效，尽量较少碰撞，也就是要尽量把数据分配均匀。
+
+1、2的幂次方满足**hash%length==hash&(length-1)**。使用&操作更加高效。
+
+2、奇数不行的解释很能被接受，在计算hash的时候，确定落在数组的位置的时候，计算方法是(n - 1) & hash ，奇数n-1为偶数，偶数2进制的结尾都是0，经过&运算末尾都是0，会增加hash冲突。
+
+##### 6.ConcurrentHashMap与Hashtable
+
+`ConcurrentHashMap` 和 `Hashtable` 的区别主要体现在实现线程安全的方式上不同。
+
+- **底层数据结构：** JDK1.7 的 `ConcurrentHashMap` 底层采用 **分段的数组+链表** 实现，JDK1.8 采用的数据结构跟 `HashMap1.8` 的结构一样，数组+链表/红黑二叉树。`Hashtable` 和 JDK1.8 之前的 `HashMap` 的底层数据结构类似都是采用 **数组+链表** 的形式，数组是 HashMap 的主体，链表则是主要为了解决哈希冲突而存在的；
+
+- **实现线程安全的方式（重要）：**
+
+   ① **在 JDK1.7 的时候，`ConcurrentHashMap`（分段锁）** 对整个桶数组进行了分割分段(`Segment`)，每一把锁只锁容器其中一部分数据，多线程访问容器里不同数据段的数据，就不会存在锁竞争，提高并发访问率。 **到了 JDK1.8 的时候已经摒弃了 `Segment` 的概念，而是直接用 `Node` 数组+链表+红黑树的数据结构来实现，并发控制使用 `synchronized` 和 CAS 来操作。（JDK1.6 以后 对 `synchronized` 锁做了很多优化）** 整个看起来就像是优化过且线程安全的 `HashMap`，虽然在 JDK1.8 中还能看到 `Segment` 的数据结构，但是已经简化了属性，只是为了兼容旧版本；`synchronized` 只锁定当前链表或红黑二叉树的首节点，这样只要 hash 不冲突，就不会产生并发，效率又提升 N 倍。
+
+  ② **`Hashtable`(同一把锁)** :使用 `synchronized` 来保证线程安全，效率非常低下。当一个线程访问同步方法时，其他线程也访问同步方法，可能会进入阻塞或轮询状态，如使用 put 添加元素，另一个线程不能使用 put 添加元素，也不能使用 get，竞争会越来越激烈效率越低。
+
+ <img src="/Users/aixin/Desktop/u盘/java/studyNote/studyNote/java面试/java面试.assets/image-20210428175039733.png" alt="image-20210428175039733" style="zoom:50%;" />
 
 ### 1.8、动态代理
 
@@ -801,6 +853,43 @@ public void teacherTest2() throws IOException, ClassNotFoundException {
     System.out.println(t1 == t3);
 }
 ```
+
+
+
+## 4.JVM
+
+### 4.1、双亲委派机制
+
+我们在IDE中编写的Java源代码被编译器编译成**.class**的字节码文件。然后由我们得ClassLoader负责将这些class文件给加载到JVM中去执行。
+
+类的加载器类别：
+
+- BootstrapClassLoader（启动类加载器）：使用C++编写，加载核心库java.*，构造ExtClassLoader和AppClassLoader。开发则无法直接获取该加载器的引用。
+
+  ```java
+  String s = new String();
+  System.out.println(s.getClass().getClassLoader());//null
+  ```
+
+- ExtClassLoader（标准扩展类加载器）:主要负责加载jre/lib/ext目录下的一些扩展的jar。
+
+- AppClassLoader（系统类加载器）:负责加载第三方与自己编写的类。
+
+  ```java
+  System.out.println(User.class.getClassLoader());//sun.misc.Launcher$AppClassLoader@18b4aac2
+  System.out.println(User.class.getClassLoader().getParent());//sun.misc.Launcher$ExtClassLoader@4554617c
+  System.out.println(User.class.getClassLoader().getParent().getParent());//null
+  ```
+
+  
+
+ ![image-20210406215643186](java面试.assets/image-20210406215643186.png)
+
+加载机制就是当一个class文件要被加载时，会先在AppClassLodaer加载器中检查是否已经被加载过，如果被加载过则无需再加载了，如果没有则再继续向上查找，这样一层一层找，找到最上层的BootstrapClassLoader如果也没有被加载过则判断该加载器是否可以加载，如果不可以则找到下一级的加载器进行判断，这样一级一级向下进行判断，如果到AppClassLoader还是不能加载则抛出ClassNotFoundException。
+
+这样的加载的意义就是为了防止替换java的核心类。
+
+
 
 # spring
 
