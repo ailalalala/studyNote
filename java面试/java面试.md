@@ -287,9 +287,66 @@ sendEmail.sendMessage("哈哈哈");
 1. **灵活性** ：动态代理更加灵活，不需要必须实现接口，可以直接代理实现类，并且可以不需要针对每个目标类都创建一个代理类。另外，静态代理中，接口一旦新增加方法，目标对象和代理对象都要进行修改，这是非常麻烦的！
 2. **JVM 层面** ：静态代理在编译时就将接口、实现类、代理类这些都变成了一个个实际的 class 文件。而动态代理是在运行时动态生成类字节码，并加载到 JVM 中的。
 
+### 1.9、反射
+
+获取Class对象的四种方式
+
+```java
+//方法1
+Class c1 = Class1.class;
+//方法2
+Class c2 = Class.forName("com.xin.basic.Class1");
+//方法3
+Class c3 = class2.getClass();
+//方法4
+ClassLoader classLoader = Class2.class.getClassLoader();
+Class<?> aClass = classLoader.loadClass("com.xin.basic.Class2");
+```
+
+获取属性与方法
+
+```java
+Class<?> targetClass = Class.forName("com.xin.basic.reflection.Class1");
+Class1 class1 = (Class1) targetClass.newInstance();
+//获取类中所有的方法
+Method[] methods = targetClass.getDeclaredMethods();
+for (Method method : methods) {
+    System.out.println(method.getName());
+}
+//获取public方法
+Method publicMethod = targetClass.getDeclaredMethod("publicMethod",String.class);
+publicMethod.invoke(class1,"lalala");
+//获取指定参数
+Field field = targetClass.getDeclaredField("name");
+field.setAccessible(true);//为了对类中的参数进行修改我们取消安全检查
+field.set(class1,"aixin");
+//获取私有方法
+Method privateMethod = targetClass.getDeclaredMethod("privateMethod");
+privateMethod.setAccessible(true);//为了调用private方法我们取消安全检查
+privateMethod.invoke(class1);
+```
+
+
+
 ## 2.多线程
 
 ### 2.1、多线程基础
+
+堆与方法区（JDK1.8之后的元空间）为线程共享，程序计数器、虚拟机栈、本地方法栈是线程私有的。
+
+程序计数器私有主要是为了线程切换后能恢复到正确的执行位置。
+
+虚拟机栈与本地方法栈线程私有是为了保证线程中的局部变量不被别的线程访问到。
+
+堆是进程中最大的一块内存，主要用于存放新创建的对象，方法区主要用于存放已被加载的类信息、常量、静态常量、即时编译器编译后的代码等数据。
+
+**线程的生命周期：**
+
+ <img src="java面试.assets/image-20210510202015693.png" alt="image-20210510202015693" style="zoom:80%;" />
+
+ <img src="java面试.assets/image-20210510202513830.png" alt="image-20210510202513830" style="zoom:67%;" />
+
+
 
 #### 2.1.1、**守护线程**:
 
@@ -532,51 +589,7 @@ public static void main(String[] args) throws InterruptedException {
 
 
 
-#### 2.1.8、**synchronized：**
-
-synchronized有三种：
-
-- 放在普通方法上
-
-  ```java
-  public synchronized void test1(){
-      
-  }
-  ```
-
-  持有的是对象锁
-
-- 放在静态方法上
-
-  ```java
-  public synchronized static void test2(){
-  
-  }
-  ```
-
-  持有的是类锁
-
-- 放在代码块上
-
-  ```java
-  private static Object o = new Object();
-  public void test3(){
-      synchronized (SynchronizedTest.class){
-  
-      }
-      synchronized (o){
-  
-      }
-  }
-  ```
-
-  上面持有的是类锁，下面持有的是对象锁。
-
-synchronized实现原理：synchronized实现是基于jvm实现的，synchronized修饰方法在字节码中添加了一个ACC_SYNCHRONIZED的flags，同步代码块则是在同步的代码块前插入monitorenter，在同步代码块之后插入monitorexit。当线程执行到某个方法时，jvm会去检查方法的ACC_SYNCHRONIZED访问标志是否被设置，如果设置了那该线程就获取了这个对象对应的monitor对象，获取成功后再执行方法体，执行结束后释放monitor对象。代码块也是一样，遇到了monitorenter就获取monitor，遇到了monitorexit就释放monitor。
-
-monitor（对象监视器）：是有C++代码实现的。
-
-#### 2.1.9、死锁
+#### 2.1.8、死锁
 
 死锁就是多个线程在争夺资源的情况下造成互相等待的情况，如果没有外力驱动就会一直等待下去。
 
@@ -632,7 +645,97 @@ public class DeadLockTest {
 
 防止死锁：只要破坏上述条件其中一条就不会产生死锁。
 
-### 2.2、volatile
+### 2.2、synchronized
+
+synchronized有三种：
+
+- 放在普通方法上
+
+  ```java
+  public synchronized void test1(){
+      
+  }
+  ```
+
+  持有的是对象锁
+
+- 放在静态方法上
+
+  ```java
+  public synchronized static void test2(){
+  
+  }
+  ```
+
+  持有的是类锁
+
+- 放在代码块上
+
+  ```java
+  private static Object o = new Object();
+  public void test3(){
+      synchronized (SynchronizedTest.class){
+  
+      }
+      synchronized (o){
+  
+      }
+  }
+  ```
+
+  上面持有的是类锁，下面持有的是对象锁。
+
+**synchronized实现原理：**
+
+synchronized实现是基于jvm实现的，synchronized修饰方法在字节码中添加了一个ACC_SYNCHRONIZED的flags，同步代码块则是在同步的代码块前插入monitorenter，在同步代码块之后插入monitorexit。当线程执行到某个方法时，jvm会去检查方法的ACC_SYNCHRONIZED访问标志是否被设置，如果设置了那该线程就获取了这个对象对应的monitor对象，获取成功后再执行方法体，执行结束后释放monitor对象。代码块也是一样，遇到了monitorenter就获取monitor，遇到了monitorexit就释放monitor。
+
+monitor（对象监视器）：是有C++代码实现的。
+
+<img src="java面试.assets/image-20210510204314024.png" alt="image-20210510204314024" style="zoom:80%;" />
+
+synchronized修饰代码块使用的是monitorenter和monitorexit指令。其中monitorenter指令指向同步代码块的开始位置，monitorexit指令则指明同步代码块的结束位置。当执行monitorenter指令时，线程试图获取锁也就是获取对象监视器monitor的持有权。如果锁的计数器为0则表示锁可以被获取，获取后将锁计数器+1.
+
+当执行到monitorexit指令之后，将锁计数器设为0，标明锁被释放。如果获取对象锁失败，那当前线程就要阻塞等待，直到锁被另外一个线程释放为止。
+
+ <img src="java面试.assets/image-20210510204911243.png" alt="image-20210510204911243" style="zoom:80%;" />
+
+
+
+**两者的本质都是对monitor对象监视器的获取。**
+
+**JDK1.6之后的synchronized关键字底层优化：**
+
+锁主要的四种状态，依次是：无锁状态、偏向锁状态、轻量级锁状态、重量级锁状态，它们会随着竞争的激烈而逐渐升级。注意锁只能升级不能降级，这种策略是为了提高获得锁和释放锁的效率。
+
+关于这几种优化的详细信息可以查看下面这篇文章：[Java6 及以上版本对 synchronized 的优化](https://www.cnblogs.com/wuqinglong/p/9945618.html)
+
+在HotSpot虚拟机中，对象在内存中的布局分为三块区域：对象头，示例数据和对其填充。
+
+对象头中包含两部分：MarkWord和类型指针，如果是数组对象的话还有一部分是存储数组的长度。
+
+多线程下synchronized的加锁就是对同一个对象头中的MarkWord的变量进行CAS操作。
+
+Mark Word用于存储对象自身的运行时数据, 如HashCode, GC分代年龄, 锁状态标志, 线程持有的锁, 偏向线程ID等等.占用内存大小与虚拟机位长一致(32位JVM -> MarkWord是32位, 64位JVM->MarkWord是64位).
+
+类型指针指向对象的类元数据, 虚拟机通过这个指针确定该对象是哪个类的实例.
+
+当只有一个线程访问同步代码块并获取锁的时候，会在锁对象的对象头和栈帧中的锁记录里存储锁偏向的线程ID。当出现两个线程来竞争锁的时候，那么偏向锁就失效了，此时锁就会膨胀升级为轻量级锁 有线程A和线程B来竞争对象c的锁(如: synchronized(c){} ), 这时线程A和线程B同时将对象c的MarkWord复制到自己的锁记录中, 两者竞争去获取锁, 假设线程A成功获取锁, 并将对象c的对象头中的线程ID(MarkWord中)修改为指向自己的锁记录的指针, 这时线程B仍旧通过CAS去获取对象c的锁, 因为对象c的MarkWord中的内容已经被线程A改了, 所以获取失败. 此时为了提高获取锁的效率, 线程B会循环去获取锁, 这个循环是有次数限制的, 如果在循环结束之前CAS操作成功, 那么线程B就获取到锁, 如果循环结束依然获取不到锁, 则获取锁失败, 对象c的MarkWord中的记录会被修改为重量级锁, 然后线程B就会被挂起, 之后有线程C来获取锁时, 看到对象c的MarkWord中的是重量级锁的指针, 说明竞争激烈, 直接挂起.
+
+解锁时, 线程A尝试使用CAS将对象c的MarkWord改回自己栈中复制的那个MarkWord, 因为对象c中的MarkWord已经被指向为重量级锁了, 所以CAS失败. 线程A会释放锁并唤起等待的线程, 进行新一轮的竞争.
+
+**synchronized与ReentrantLock的区别：**
+
+两者都是可重入锁
+
+- synchronized依赖于JVM而ReentrantLock依赖于API
+- ReentrantLock比synchronized增加了一些高级功能
+  - 等待可中断：ReentrantLock提供了一种能中断等待锁的线程的机制，通过lock.lockInterruptibly()来实现这个机制。也就说正在等待的线程可以选择放弃等待，改为处理其他事情。
+  - 可实现公平锁，synchronized只能是非公平锁。可以通过ReentrantLock的构造方法传递boolean的值来定制是否为公平。
+  - 可实现选择性通知（锁可以绑定多个条件）：`synchronized`关键字与`wait()`和`notify()`/`notifyAll()`方法相结合可以实现等待/通知机制。`ReentrantLock`类当然也可以实现，但是需要借助于`Condition`接口与`newCondition()`方法。
+
+
+
+### 2.3、volatile
 
 volitile：保证可见性，禁止指令重排，不保证原子性
 
@@ -716,7 +819,7 @@ public static void main(String[] args) {
 
 使用AtomicInteger来实现原子性的操作。
 
-### 2.3、单例模式现下的多线程问题
+#### 2.3.1、单例模式现下的多线程问题
 
 ```java
 public class SingleDemo {
@@ -777,11 +880,80 @@ public static SingleDemo getSingleDemo(){
 
 在private static SingleDemo singleDemo;上添加volatile防止指令重排。
 
-### 2.4、CAS
+### 2.4、ThreadLocal
 
-cas：比较并交换
+#### 2.4.1、ThreadLocal简介
 
+通常情况下，我们创建的变量是可以被任何一个线程访问并修改的。**如果想实现每一个线程都有自己的专属本地变量该如何解决呢？** JDK 中提供的`ThreadLocal`类正是为了解决这样的问题。 **`ThreadLocal`类主要解决的就是让每个线程绑定自己的值，可以将`ThreadLocal`类形象的比喻成存放数据的盒子，盒子中可以存储每个线程的私有数据。**
 
+**如果你创建了一个`ThreadLocal`变量，那么访问这个变量的每个线程都会有这个变量的本地副本，这也是`ThreadLocal`变量名的由来。他们可以使用 `get（）` 和 `set（）` 方法来获取默认值或将其值更改为当前线程所存的副本的值，从而避免了线程安全问题。**
+
+#### 2.4.2、ThreadLocal示例
+
+```java
+public class ThreadLocalExample implements Runnable{
+
+    private static final ThreadLocal<String> threadLocal = ThreadLocal.withInitial(()->"defalutValue");
+
+    @Override
+    public void run() {
+        System.out.println("ThreadName ="+Thread.currentThread().getName()+"defalutValue:"+threadLocal.get());
+        try {
+            Thread.sleep(new Random().nextInt(1000));
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        threadLocal.set(Thread.currentThread().getName());
+        System.out.println("ThreadName ="+Thread.currentThread().getName()+"newValue:"+threadLocal.get());
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+        ThreadLocalExample example = new ThreadLocalExample();
+        for (int i = 0; i < 10; i++) {
+            Thread t = new Thread(example,""+i);
+            Thread.sleep(new Random().nextInt(1000));
+            t.start();
+        }
+    }
+}
+```
+
+根据结果可以看到尽管各种线程已经修改了ThreadLocal的值但是下一个线程的值还是默认值。
+
+#### 2.4.3、ThreadLocal原理
+
+Threa源码：
+
+```java
+public class Thread implements Runnable {
+ ......
+//与此线程有关的ThreadLocal值。由ThreadLocal类维护
+ThreadLocal.ThreadLocalMap threadLocals = null;
+
+//与此线程有关的InheritableThreadLocal值。由InheritableThreadLocal类维护
+ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
+ ......
+}
+```
+
+从上面可以看到Thread类中有一个threadLocals和一个inheritableThreadLocals变量，它们都是ThreadLocalMap类型的变量，我们可以把ThreadLocalMap理解为ThreadLocal类实现的定制化HashMap。默认情况下这两个变量都是null，只有当前线程调用ThreadLocal类的set或get方法时才创建它们，实际上调用这两个方法的时候我们调用的是ThreadLocalMap类对应的get和set方法。
+
+ThreadLocal的set方法
+
+```java
+public void set(T value) {
+    Thread t = Thread.currentThread();
+    ThreadLocalMap map = getMap(t);
+    if (map != null)
+        map.set(this, value);
+    else
+        createMap(t, value);
+}
+```
+
+#### 2.4.4、ThreadLocal内存泄漏问题
+
+ThreadLocalMap中使用的Key为ThreadLocal的弱引用，而value为强引用。所以如果ThreadLocal没有被外部强引用的情况下，在垃圾回收的时候，key会被清理掉，而value不会被清理掉。这样一来，ThreadLocalMap中就会出现key为null的Entry，如果不采取任何措施的话，value永远不会被GC回收，这个时候就可能会产生内存泄漏。ThreadLocalMap实现中已经考虑了这种情况，在调用set，get，remove方法的时候会清理掉key为null的记录。使用完ThreadLocal最好手动调用remove方法。
 
 ## 3.IO流
 
