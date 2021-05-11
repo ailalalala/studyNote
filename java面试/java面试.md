@@ -1003,6 +1003,224 @@ excute方法提交不需要返回值的任务，所以无法判断任务是否�
 
 submit方法用于提交需要返回值的任务。线程池会返回一个Future类型的对象，通过这个对象可以判断任务是否被执行成功，并且可以通过Future的get方法获取返回值，get方法会阻塞当前线程知道任务执行完成。
 
+#### 2.5.4、如何创建线程池
+
+阿里巴巴Java开发手册中强制线程池不允许使用Executors去创建，而是通过ThreadPoolExecutor的方式，这样的处理方式可以更加明确线程池规则，规避资源耗尽的风险。
+
+**方式1：通过构造方法实现**
+
+ <img src="java面试.assets/image-20210511201326246.png" alt="image-20210511201326246" style="zoom:80%;" />
+
+**方式2：通过Executors工具类来实现**
+
+- FixedThreadPool:newFixedThreadPool(int nThreads)该方法返回一个固定线程数量的线程池。该线程池中的线程数量始终不变，当有一个新的任务提交时，线程池中若有空闲的线程则立即执行，若没有，则新的任务会被暂存在一个任务队列中，待有线程空闲时，便处理在任务队列中的任务。
+- SingleThreadExecutor：newSingleThreadExecutor()该方法返回一个只有一个线程的线程池。若多余一个任务被提交到该线程池，任务会被保存在一个任务队列中，待线程空闲，按先入先出的顺序执行队列中的任务。
+- CachedThreadPool：newCachedThreadPool()该方法返回一个可根据实际情况调整的线程数量的线程池。线程池的线程数量不确定，但若有空闲线程可以复用，则会优先使用可复用的线程。若所有线程均在工作，又有新的任务提交则会创建新的线程处理任务。所有线程在当前任务执行完毕后，将返回线程池进行复用。
+
+#### 2.5.5、ThreadPoolExecutor类分析
+
+ThreadPoolExecutor类中提供了四个构造方法。
+
+![image-20210511202743485](java面试.assets/image-20210511202743485.png)
+
+```java
+public ThreadPoolExecutor(int corePoolSize,
+                          int maximumPoolSize,
+                          long keepAliveTime,
+                          TimeUnit unit,
+                          BlockingQueue<Runnable> workQueue,
+                          ThreadFactory threadFactory,
+                          RejectedExecutionHandler handler) {
+    if (corePoolSize < 0 ||
+        maximumPoolSize <= 0 ||
+        maximumPoolSize < corePoolSize ||
+        keepAliveTime < 0)
+        throw new IllegalArgumentException();
+    if (workQueue == null || threadFactory == null || handler == null)
+        throw new NullPointerException();
+    this.corePoolSize = corePoolSize;
+    this.maximumPoolSize = maximumPoolSize;
+    this.workQueue = workQueue;
+    this.keepAliveTime = unit.toNanos(keepAliveTime);
+    this.threadFactory = threadFactory;
+    this.handler = handler;
+}
+```
+
+- corePoolSize:核心线程数，定义了最小可以同时运行的线程数量。
+- maximumPoolSize：当队列中存放的任务达到队列容量的时候，当前可以同时运行的线程数量变为最大线程数。
+- workQueue：当新任务来的时候会先判断当前运行的线程数量是否达到了核心线程数，如果达到的话新任务就会被存放在队列中。
+- keepAliveTime：当线程池中的线程数量大于核心线程数的时候，如果这时候没有新的任务提交，核心线程外的线程不会立即销毁，而是会等待，知道等待时间超过了keepAliveTime才会被销毁。
+- unit：keepAliveTime参数的时间单位。
+- threadFactory：表示生成线程池中工作线程的工厂，用于创建线程，一般使用默认即可。
+- handler：拒绝策略（饱和策略）
+
+**饱和策略：**
+
+如果当时同时运行的线程数量达到了最大线程数量并且队列也已经被放满的时候，ThreadPoolTaskExecutor定义了一些策略：
+
+- `ThreadPoolExecutor.AbortPolicy`：抛出RejectedExecutionException来拒绝新任务的处理。（默认未该策略）
+- `ThreadPoolExecutor.CallerRunsPolicy`：”调用者运行“一种调节机制，该策略不会丢弃任务也不会抛出异常，而是将某些任务回退到调用者，从而降低新任务的流量。
+- `ThreadPoolExecutor.DiscardPolicy`：不处理新任务，直接丢弃。
+
+- `ThreadPoolExecutor.DiscardOldestPolicy`：将等待最久的未处理的任务丢弃。
+
+```java
+public static void main(String[] args) {
+    ThreadPoolExecutor threadPoolExecutor = new ThreadPoolExecutor(
+            2,
+            5,
+            1L,
+            TimeUnit.SECONDS,
+            new LinkedBlockingDeque<Runnable>(3),
+            Executors.defaultThreadFactory(),
+            new ThreadPoolExecutor.CallerRunsPolicy()
+    );
+    try{
+        for (int i = 0; i < 9; i++) {
+            threadPoolExecutor.execute(()->{
+                System.out.println(Thread.currentThread().getName()+"\t 办理任务");
+            });
+        }
+    }catch (Exception e){
+        e.printStackTrace();
+    }finally {
+        threadPoolExecutor.shutdown();
+    }
+}
+
+/**
+pool-1-thread-1	 办理任务
+pool-1-thread-2	 办理任务
+pool-1-thread-1	 办理任务
+pool-1-thread-4	 办理任务
+main	 办理任务
+pool-1-thread-3	 办理任务
+pool-1-thread-1	 办理任务
+pool-1-thread-2	 办理任务
+pool-1-thread-5	 办理任务
+*/
+```
+
+#### 2.5.6、原理分析
+
+ <img src="java面试.assets/image-20210511213238112.png" alt="image-20210511213238112" style="zoom:90%;" />
+
+### 2.6、Atomic原子类
+
+#### 2.6.1、原子类简介
+
+具有原子操作特性的类。
+
+ <img src="java面试.assets/image-20210511213524428.png" alt="image-20210511213524428" style="zoom:100%;" />
+
+#### 2.6.2、原子类的四类
+
+**基本类型**
+
+- `AtomicInteger`
+- `AtomicLong`
+- `AtomicBoolean`
+
+**数组类型**
+
+- `AtomicIntegerArray`
+- `AtomicLongArray`
+- `AtomicReferenceArray`
+
+**引用类型**
+
+- `AtomicReference`
+- `AtomicStampedReference`：原子更新带有版本号的引用类型。可以解决ABA问题。
+- `AtomicMarkableReference`：原子更新带有标记位的引用类型
+
+**对象的属性修改类型**
+
+- `AtomicIntegerFieldUpdater`：原子更新整形字段的更新器
+- `AtomicLongFieldUpdater`：原子更新长整形字段的更新器
+- `AtomicReferenceFieldUpdater`：原子更新引用类型字段的更新器
+
+AtomicInteger类的常用方法：
+
+```java
+public final int get() //获取当前的值
+public final int getAndSet(int newValue)//获取当前的值，并设置新的值
+public final int getAndIncrement()//获取当前的值，并自增
+public final int getAndDecrement() //获取当前的值，并自减
+public final int getAndAdd(int delta) //获取当前的值，并加上预期的值
+boolean compareAndSet(int expect, int update) //如果输入的数值等于预期值，则以原子方式将该值设置为输入值（update）
+public final void lazySet(int newValue)//最终设置为newValue,使用 lazySet 设置之后可能导致其他线程在之后的一小段时间内还是可以读到旧的值。
+```
+
+#### 2.6.3、AtomicInteger原理
+
+```java
+//部分源码
+private static final Unsafe unsafe = Unsafe.getUnsafe();
+private static final long valueOffset;
+
+static {
+    try {
+        valueOffset = unsafe.objectFieldOffset
+            (AtomicInteger.class.getDeclaredField("value"));
+    } catch (Exception ex) { throw new Error(ex); }
+}
+
+private volatile int value;
+```
+
+AtomicInteger类主要利用CAS（Compare and Swap）+colatile和native方法来保证原子操作，从而避免synchronized的高开销。
+
+CAS 的原理是拿期望的值和原本的一个值作比较，如果相同则更新成新的值。UnSafe 类的 objectFieldOffset() 方法是一个本地方法，这个方法是用来拿到“原来的值”的内存地址，返回值是 valueOffset。另外 value 是一个 volatile 变量，在内存中可见，因此 JVM 可以保证任何时刻任何线程总能拿到该变量的最新值。
+
+### 2.7、AQS
+
+#### 2.7.1、AQS介绍
+
+AQS的全程为Abstract Queue Synchronizer。
+
+AQS时一个用来构建锁和同步器的框架，使用AQS能简单且高效地构造出应用广泛的大量的同步器，比如ReentrantLock，Semaphore，其他的比如ReentrantReadWriterLock，SynchronousQueue，FutureTask都是基于AQS的。
+
+#### 2.7.2、AQS原理分析
+
+AQS核心思想是，如果被请求的共享资源空闲，则将当前请求资源的线程设置为有效的工作线程，并且将共享资源设置为锁定状态。如果被请求的共享资源被占用，那么就需要一套线程阻塞等待以及被唤醒时锁分配的机制，这个机制AQS是用CLH队列锁实现的，即将暂时获取不到锁的线程加入到队列中。
+
+> CLH(Craig,Landin,and Hagersten)队列是一个虚拟的双向队列（虚拟的双向队列即不存在队列实例，仅存在结点之间的关联关系）。AQS 是将每条请求共享资源的线程封装成一个 CLH 锁队列的一个结点（Node）来实现锁的分配。
+
+ <img src="java面试.assets/image-20210511221057687.png" alt="image-20210511221057687" style="zoom:80%;" />
+
+**AQS定义两种对资源共享方式：**
+
+- Exclusive（独占）：只有一个线程能执行，如ReentrantLock。又可分为公平锁和非公平锁。
+- share（共享）：多个线程可同时执行，如CountDownLatch，Semaphore，CyclicBarrier。ReadWriteLock。
+
+不同的自定义同步器争用共享资源的方式也不同。自定义同步器在实现时只需要实现共享资源state的获取与释放方式即可，置于具体线程等待队列的维护，AQS已经在顶层实现好了。
+
+**AQS 使用了模板方法模式，自定义同步器时需要重写下面几个 AQS 提供的模板方法：**
+
+```java
+isHeldExclusively()//该线程是否正在独占资源。只有用到condition才需要去实现它。
+tryAcquire(int)//独占方式。尝试获取资源，成功则返回true，失败则返回false。
+tryRelease(int)//独占方式。尝试释放资源，成功则返回true，失败则返回false。
+tryAcquireShared(int)//共享方式。尝试获取资源。负数表示失败；0表示成功，但没有剩余可用资源；正数表示成功，且有剩余资源。
+tryReleaseShared(int)//共享方式。尝试释放资源，成功则返回true，失败则返回false。
+Copy to clipboardErrorCopied
+```
+
+默认情况下，每个方法都抛出 `UnsupportedOperationException`。 这些方法的实现必须是内部线程安全的，并且通常应该简短而不是阻塞。AQS 类中的其他方法都是 final ，所以无法被其他类使用，只有这几个方法可以被其他类使用。
+
+以 ReentrantLock 为例，state 初始化为 0，表示未锁定状态。A 线程 lock()时，会调用 tryAcquire()独占该锁并将 state+1。此后，其他线程再 tryAcquire()时就会失败，直到 A 线程 unlock()到 state=0（即释放锁）为止，其它线程才有机会获取该锁。当然，释放锁之前，A 线程自己是可以重复获取此锁的（state 会累加），这就是可重入的概念。但要注意，获取多少次就要释放多么次，这样才能保证 state 是能回到零态的。
+
+再以 `CountDownLatch` 以例，任务分为 N 个子线程去执行，state 也初始化为 N（注意 N 要与线程个数一致）。这 N 个子线程是并行执行的，每个子线程执行完后` countDown()` 一次，state 会 CAS(Compare and Swap)减 1。等到所有子线程都执行完后(即 state=0)，会 unpark()主调用线程，然后主调用线程就会从 `await()` 函数返回，继续后余动作。
+
+一般来说，自定义同步器要么是独占方法，要么是共享方式，他们也只需实现`tryAcquire-tryRelease`、`tryAcquireShared-tryReleaseShared`中的一种即可。但 AQS 也支持自定义同步器同时实现独占和共享两种方式，如`ReentrantReadWriteLock`。
+
+#### 2.7.3、AQS组件总结
+
+- **`Semaphore`(信号量)-允许多个线程同时访问：** `synchronized` 和 `ReentrantLock` 都是一次只允许一个线程访问某个资源，`Semaphore`(信号量)可以指定多个线程同时访问某个资源。
+- **`CountDownLatch `（倒计时器）：** `CountDownLatch` 是一个同步工具类，用来协调多个线程之间的同步。这个工具通常用来控制线程等待，它可以让某一个线程等待直到倒计时结束，再开始执行。
+- **`CyclicBarrier`(循环栅栏)：** `CyclicBarrier` 和 `CountDownLatch` 非常类似，它也可以实现线程间的技术等待，但是它的功能比 `CountDownLatch` 更加复杂和强大。主要应用场景和 `CountDownLatch` 类似。`CyclicBarrier` 的字面意思是可循环使用（`Cyclic`）的屏障（`Barrier`）。它要做的事情是，让一组线程到达一个屏障（也可以叫同步点）时被阻塞，直到最后一个线程到达屏障时，屏障才会开门，所有被屏障拦截的线程才会继续干活。`CyclicBarrier` 默认的构造方法是 `CyclicBarrier(int parties)`，其参数表示屏障拦截的线程数量，每个线程调用 `await()` 方法告诉 `CyclicBarrier` 我已经到达了屏障，然后当前线程被阻塞。
+
 ## 3.IO流
 
 ### 3.1、IO
