@@ -955,6 +955,54 @@ public void set(T value) {
 
 ThreadLocalMap中使用的Key为ThreadLocal的弱引用，而value为强引用。所以如果ThreadLocal没有被外部强引用的情况下，在垃圾回收的时候，key会被清理掉，而value不会被清理掉。这样一来，ThreadLocalMap中就会出现key为null的Entry，如果不采取任何措施的话，value永远不会被GC回收，这个时候就可能会产生内存泄漏。ThreadLocalMap实现中已经考虑了这种情况，在调用set，get，remove方法的时候会清理掉key为null的记录。使用完ThreadLocal最好手动调用remove方法。
 
+### 2.5、线程池
+
+#### 2.5.1、为什么使用线程池
+
+池化技术减少每次获取资源的消耗，提高对资源的利用率。
+
+线程池提供了一种限制和管理资源。每个线程池还维护一些基本的统计信息，比如已经完成的线程数量。
+
+使用线程池的好处：
+
+- 减少资源消耗。通过重复利用已创建的线程降低线程创建和销毁造成的消耗。
+- 提高响应速度。当任务到达时，任务可以不需要的等到线程创建就能立即执行。
+- 提高线程的可管理性。线程是稀缺资源，如果无限制的创建，不仅会消耗系统资源，还会降低系统的稳定性，使用线程池可以进行统一的分配，调优和监控。
+
+#### 2.5.2、实现Runnable接口与Callable接口的区别
+
+Runnable接口不会返回结果或抛出检查异常。但是Callable接口可以。如果任务不需要返回结果或抛出检查异常那么建议使用Runnable接口，这样代码更简洁。
+
+工具类 `Executors` 可以实现 `Runnable` 对象和 `Callable` 对象之间的相互转换。（`Executors.callable（Runnable task`）或 `Executors.callable（Runnable task，Object resule）`）。
+
+```java
+@FunctionalInterface
+public interface Runnable {
+   /**
+    * 被线程执行，没有返回值也无法抛出异常
+    */
+    public abstract void run();
+}
+```
+
+```java
+@FunctionalInterface
+public interface Callable<V> {
+    /**
+     * 计算结果，或在无法这样做时抛出异常。
+     * @return 计算得出的结果
+     * @throws 如果无法计算结果，则抛出异常
+     */
+    V call() throws Exception;
+}
+```
+
+#### 2.5.3、执行excute()与submit()的区别
+
+excute方法提交不需要返回值的任务，所以无法判断任务是否被线程执行成功。
+
+submit方法用于提交需要返回值的任务。线程池会返回一个Future类型的对象，通过这个对象可以判断任务是否被执行成功，并且可以通过Future的get方法获取返回值，get方法会阻塞当前线程知道任务执行完成。
+
 ## 3.IO流
 
 ### 3.1、IO
