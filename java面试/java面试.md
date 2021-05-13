@@ -936,6 +936,21 @@ ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 }
 ```
 
+```java
+static class ThreadLocalMap {
+    static class Entry extends WeakReference<ThreadLocal<?>> {
+        /** The value associated with this ThreadLocal. */
+        Object value;
+
+        Entry(ThreadLocal<?> k, Object v) {
+            super(k);
+            value = v;
+        }
+    }
+     ...... ......
+}
+```
+
 从上面可以看到Thread类中有一个threadLocals和一个inheritableThreadLocals变量，它们都是ThreadLocalMap类型的变量，我们可以把ThreadLocalMap理解为ThreadLocal类实现的定制化HashMap。默认情况下这两个变量都是null，只有当前线程调用ThreadLocal类的set或get方法时才创建它们，实际上调用这两个方法的时候我们调用的是ThreadLocalMap类对应的get和set方法。
 
 ThreadLocal的set方法
@@ -1220,6 +1235,68 @@ Copy to clipboardErrorCopied
 - **`Semaphore`(信号量)-允许多个线程同时访问：** `synchronized` 和 `ReentrantLock` 都是一次只允许一个线程访问某个资源，`Semaphore`(信号量)可以指定多个线程同时访问某个资源。
 - **`CountDownLatch `（倒计时器）：** `CountDownLatch` 是一个同步工具类，用来协调多个线程之间的同步。这个工具通常用来控制线程等待，它可以让某一个线程等待直到倒计时结束，再开始执行。
 - **`CyclicBarrier`(循环栅栏)：** `CyclicBarrier` 和 `CountDownLatch` 非常类似，它也可以实现线程间的技术等待，但是它的功能比 `CountDownLatch` 更加复杂和强大。主要应用场景和 `CountDownLatch` 类似。`CyclicBarrier` 的字面意思是可循环使用（`Cyclic`）的屏障（`Barrier`）。它要做的事情是，让一组线程到达一个屏障（也可以叫同步点）时被阻塞，直到最后一个线程到达屏障时，屏障才会开门，所有被屏障拦截的线程才会继续干活。`CyclicBarrier` 默认的构造方法是 `CyclicBarrier(int parties)`，其参数表示屏障拦截的线程数量，每个线程调用 `await()` 方法告诉 `CyclicBarrier` 我已经到达了屏障，然后当前线程被阻塞。
+
+### 2.8、并发容器
+
+#### 2.8.1、 CopyOnWriteArrayList
+
+CopyOnWriteArrayList 读取是完全不用加锁的，并且更厉害的是：写入也不会阻塞读取操作。只有写入和写入之间需要进行同步等待。这样一来，读操作的性能就会大幅度提升。
+
+CopyOnWriteArrayList的所有可变操作都是通过底层创建数组副本来实现的。当想要修改List的时候，并不会修改原内容而是对原内容进行拷贝然后对拷贝副本进行修改，写完之后将副本内容替换到原内容进行更新。
+
+```java
+    /** The array, accessed only via getArray/setArray. */
+    private transient volatile Object[] array;
+    public E get(int index) {
+        return get(getArray(), index);
+    }
+    @SuppressWarnings("unchecked")
+    private E get(Object[] a, int index) {
+        return (E) a[index];
+    }
+    final Object[] getArray() {
+        return array;
+    }
+    
+    public boolean add(E e) {
+        final ReentrantLock lock = this.lock;
+        lock.lock();//加锁
+        try {
+            Object[] elements = getArray();
+            int len = elements.length;
+            Object[] newElements = Arrays.copyOf(elements, len + 1);//拷贝新数组
+            newElements[len] = e;
+            setArray(newElements);
+            return true;
+        } finally {
+            lock.unlock();//释放锁
+        }
+    }
+```
+
+#### 2.8.2、ConcurrentLinkedQueue
+
+Java 提供的线程安全的 Queue 可以分为**阻塞队列**和**非阻塞队列**，其中阻塞队列的典型例子是 BlockingQueue，非阻塞队列的典型例子是 ConcurrentLinkedQueue，在实际应用中要根据实际需要选用阻塞队列或者非阻塞队列。 **阻塞队列可以通过加锁来实现，非阻塞队列可以通过 CAS 操作实现。**
+
+#### 2.8.3、BlockingQueue
+
+阻塞队列（BlockingQueue）被广泛使用在“生产者-消费者”，其原因是BlockingQueue提供了可阻塞的添加与移除方法。当队列为满的时候，生产者线程会被阻塞，直到队列未满，当队列为空的时候，消费者线程被阻塞知道队列插入。
+
+BlockingQueue是一个接口，实现类如下：
+
+ <img src="/Users/aixin/Desktop/u盘/java/studyNote/studyNote/java面试/java面试.assets/image-20210513183419228.png" alt="image-20210513183419228" style="zoom:60%;" />
+
+- ArrayBlockingQueue：有界队列，底层采用数组实现。一旦创建容量不允许改变。并发控制采用可重入锁控制，插入和读取操作必须要获取到锁才能进行操作。对空队列获取和满队列插入都会被阻塞。默认是使用非公平锁，如果想要使用公平锁则在构造器里加入true。
+
+  ```java
+  ArrayBlockingQueue<Integer> blockingQueue = new ArrayBlockingQueue<Integer>(10,true);
+  ```
+
+- LinkedBlockingQueue：可以当作无界队列也可以当作有界队列，未指定大小容量为Integer.MAX_VALUE，底层采用单向链表实现。
+
+- PriorityBlockingQueue：支持优先级的无界队列，默认情况下元素采用自然顺序进行排序，也可以通过自定义类实现 `compareTo()` 方法来指定元素排序规则，或者初始化时通过构造器参数 `Comparator` 来指定排序规则。并发控制采用的是 **ReentrantLock**不可以插入 null 值，同时，插入队列的对象必须是可比较大小的（comparable），否则报 ClassCastException 异常。它的插入操作 put 方法不会 阻塞，因为它是无界队列（take 方法在队列为空的时候会阻塞）。
+
+### 
 
 ## 3.IO流
 
